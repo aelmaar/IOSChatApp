@@ -3,3 +3,5 @@ __pycache__
 .env
 .DS_STORE
 db.sqlite3
+staticfiles
+logs
