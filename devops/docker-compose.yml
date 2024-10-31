@@ -3,6 +3,7 @@ services:
     build:
       context: ../backend
       dockerfile: Dockerfile
+    restart: always
     env_file:
       - .env
     expose:
@@ -15,6 +16,7 @@ services:
 
   postgres:
     image: postgres:latest
+    restart: always
     env_file:
       - .env
     ports:
@@ -26,8 +28,11 @@ services:
     build:
       context: ./nginx
       dockerfile: Dockerfile
+    restart: always
     ports:
       - "8081:80"
+    volumes:
+      - ./nginx:/etc/nginx/conf.d
     depends_on:
       - backend
     
