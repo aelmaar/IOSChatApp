@@ -39,11 +39,3 @@ def validate_birthdate(birthdate):
     if not re.match(r'^\d{4}-\d{2}-\d{2}$', birthdate):
         raise ValidationError('Date has wrong format. Use one of these formats instead: YYYY-MM-DD.')
     return birthdate
-
-# validate uniqueness of username or email
-def validate_unique(value):
-    if Users.objects.filter(username=value).exists():
-        raise ValidationError('This username is already taken.')
-    if Users.objects.filter(email=value).exists():
-        raise ValidationError('This email is already taken.')
-    return value

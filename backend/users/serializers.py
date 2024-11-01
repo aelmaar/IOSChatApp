@@ -2,12 +2,12 @@ from .models import Users
 from rest_framework import serializers
 from .validators import validate_username, validate_password_strength, validate_name, validate_birthdate, validate_unique
 from django.core.validators import validate_email
+from rest_framework.validators import UniqueValidator
 
-# register serializer
 class RegisterSerializer(serializers.ModelSerializer):
 
-    username = serializers.CharField(required=True, validators=[validate_username, validate_unique])
-    email = serializers.EmailField(required=True, validators=[validate_email, validate_unique])
+    username = serializers.CharField(required=True, validators=[validate_username, UniqueValidator(queryset=Users.objects.all(), message='This username is already taken.')])
+    email = serializers.EmailField(required=True, validators=[validate_email, UniqueValidator(queryset=Users.objects.all(), message='This email is already taken.')])
     first_name = serializers.CharField(required=True, validators=[validate_name])
     last_name = serializers.CharField(required=True, validators=[validate_name])
     birthdate = serializers.CharField(required=True, validators=[validate_birthdate])
