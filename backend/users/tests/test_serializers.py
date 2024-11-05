@@ -1,4 +1,4 @@
-from users.serializers import RegisterSerializer
+from users.serializers import RegisterSerializer, LoginSerializer
 from django.test import TestCase
 from users.models import Users
 
@@ -72,3 +72,30 @@ class RegisterSerializerTests(TestCase):
                     self.assertFalse(serializer.is_valid())
                     field = 'password' if field == 'confirm_password' else field
                     self.assertEqual(serializer.errors[field][0], error)
+
+class LoginSerializerTests(TestCase):
+
+    def setUp(self):
+        Users.objects.create_user(
+            username='testuser',
+            email='testuser@example.com',
+            first_name='testuser',
+            last_name='testuser',
+            birthdate='1990-01-01',
+            password='Swift-1234'
+        )
+
+        self.credentials = {
+            'username_or_email': 'testuser',
+            'password': 'Swift-1234'
+        }
+
+    def test_serializer_with_valid_credentials(self):
+        serializer = LoginSerializer(data=self.credentials)
+        self.assertTrue(serializer.is_valid())
+    
+    def test_serializer_with_invalid_credentials(self):
+        self.credentials['username_or_email'] = 'differentuser'
+        serializer = LoginSerializer(data=self.credentials)
+        self.assertFalse(serializer.is_valid())
+        self.assertEqual(serializer.errors["non_field_errors"][0], "username/email or password is incorrect")

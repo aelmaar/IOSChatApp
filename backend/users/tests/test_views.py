@@ -162,3 +162,43 @@ class RegisterViewTests(TestCase):
                     field = 'password' if field == 'confirm_password' else field
                     self.assertEqual(response.data[field][0], error)
 
+
+class LoginViewTests(TestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+        self.url = "/api/login/"
+
+        Users.objects.create_user(
+            username='testuser',
+            email='testuser@example.com',
+            first_name='testuser',
+            last_name='testuser',
+            birthdate='1990-01-01',
+            password='Swift-1234'
+        )
+
+        self.credentials = {
+            'username_or_email': 'testuser',
+            'password': 'Swift-1234'
+        }
+
+    def test_view_with_valid_credentials(self):
+        response = self.client.post(self.url, self.credentials)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['message'], "Login successful")
+        self.assertIn('access', response.data)
+        self.assertIn('refresh', response.data)
+    
+    def test_view_with_invalid_credentials(self):
+        self.credentials['username_or_email'] = 'differentuser'
+        response = self.client.post(self.url, self.credentials)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["non_field_errors"][0], "username/email or password is incorrect")
+    
+    def test_view_accessible_by_unauthenticated_users_only(self):
+        authenticate = self.client.post(self.url, self.credentials)
+        
+        response = self.client.post(self.url, self.credentials, headers={"Authorization":f"Bearer {authenticate.data['access']}"})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data['detail'], "You do not have permission to perform this action.")
