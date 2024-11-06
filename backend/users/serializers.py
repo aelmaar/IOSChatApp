@@ -33,7 +33,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     )
     first_name = serializers.CharField(required=True, validators=[validate_name])
     last_name = serializers.CharField(required=True, validators=[validate_name])
-    birthdate = serializers.CharField(required=True, validators=[validate_birthdate])
+    birthdate = serializers.CharField(required=False, validators=[validate_birthdate])
     password = serializers.CharField(
         style={"input_type": "password"},
         write_only=True,
@@ -69,8 +69,8 @@ class RegisterSerializer(serializers.ModelSerializer):
             username=self.validated_data["username"],
             first_name=self.validated_data["first_name"],
             last_name=self.validated_data["last_name"],
-            birthdate=self.validated_data["birthdate"],
-            picture=self.validated_data["picture"],
+            birthdate=self.validated_data.get("birthdate"),
+            picture=self.validated_data.get("picture"),
         )
         password = self.validated_data["password"]
 
