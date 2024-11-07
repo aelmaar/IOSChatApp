@@ -32,7 +32,7 @@ class RegisterSerializerTests(TestCase):
         test_cases = {
             'username': [
                 ('a', 'Username must be at least 5 characters long.'),
-                ('testuser!', 'Username must contain only alphanumeric characters and underscores.'),
+                ('testuser!', 'Username must contain only alphanumeric characters, underscores, and hyphens.'),
                 ('differentuser', 'This username is already taken.')
             ],
             'email': [

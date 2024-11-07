@@ -5,8 +5,8 @@ import re
 def validate_username(username):
     if len(username) < 5:
         raise ValidationError('Username must be at least 5 characters long.')
-    if not re.match(r'^[a-zA-Z0-9_]+$', username):
-        raise ValidationError('Username must contain only alphanumeric characters and underscores.')
+    if not re.match(r'^[a-zA-Z0-9_-]+$', username):
+        raise ValidationError('Username must contain only alphanumeric characters, underscores, and hyphens.')
     return username
 
 
