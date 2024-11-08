@@ -2,6 +2,8 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 from rest_framework import status
 from users.models import Users
+from unittest.mock import patch
+from django.urls import reverse
 
 class RegisterViewTests(TestCase):
     def setUp(self):
@@ -116,3 +118,111 @@ class LoginViewTests(TestCase):
         response = self.client.post(self.url, self.credentials, headers={"Authorization":f"Bearer {authenticate.data['access']}"})
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(response.data['detail'], "You do not have permission to perform this action.")
+
+
+class OAuthGoogleCallbackViewTests(TestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+        self.google_callback_url = reverse('oauth-google-callback')
+
+    @patch("requests.post")
+    @patch("requests.get")
+    def test_oauth_google_success(self, mock_get, mock_post):
+        # Pretend Exchanging authorization code for an access token
+        mock_post.return_value.json.return_value = {"access_token": "mock_access_token"}
+
+        # Pretend retrieving the actual google user info and GET response is successful
+        mock_userinfo = {
+            'id': '815456',
+            'email': 'test@example.com',
+            'given_name': 'Test',
+            'family_name': 'User',
+            'picture': 'https://example.com/test.png'
+        }
+        mock_get.return_value.ok = True
+        mock_get.return_value.json.return_value = mock_userinfo
+
+        response = self.client.post(self.google_callback_url, {"code": "valid_code"})
+
+        user = Users.objects.filter(email=mock_userinfo.get("email")).first()
+        self.assertIsNotNone(user)
+
+        response_data = response.json()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("access", response_data)
+        self.assertIn("refresh", response_data)
+
+    def test_oauth_google_with_empty_authorization_code(self):
+        response = self.client.post(self.google_callback_url, {})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("error_message", response.json())
+    
+    def test_oauth_google_invalid_authorization_code(self):
+        response = self.client.post(self.google_callback_url, {"code": "invalid_code"})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("error_message", response.json())
+    
+    @patch("requests.post")
+    def test_oauth_google_with_invalid_access_token(self, mock_post):
+        mock_post.return_value.json.return_value = {"access_token": "mock_invalid_access_token"}
+        
+        response = self.client.post(self.google_callback_url, {"code": "invalid_code"})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("error_message", response.json())
+
+class OAuth42CallbackViewTests(TestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+        self.callback_42_url = reverse('oauth-42-callback')
+    
+    @patch("requests.post")
+    @patch("requests.get")
+    def test_oauth_42_success(self, mock_get, mock_post):
+        # Pretend Exchanging authorization code for an access token
+        mock_post.return_value.json.return_value = {"access_token": "mock_access_token"}
+
+        # Pretend retrieving the actual 42 user info and GET response is successful
+        mock_userinfo = {
+            'id': '815456',
+            'email': 'test@example.com',
+            'login':'testuser',
+            'first_name': 'Test',
+            'last_name': 'User',
+            'image': {"versions": {"medium":"https://example.com/test.png"}}
+        }
+        mock_get.return_value.ok = True
+        mock_get.return_value.json.return_value = mock_userinfo
+
+        response = self.client.post(self.callback_42_url, {"code": "valid_code"})
+
+        user = Users.objects.filter(email=mock_userinfo.get("email")).first()
+        self.assertIsNotNone(user)
+
+        response_data = response.json()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("access", response_data)
+        self.assertIn("refresh", response_data)
+    
+    def test_oauth_42_with_empty_authorization_code(self):
+        response = self.client.post(self.callback_42_url, {})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("error_message", response.json())
+    
+    def test_oauth_42_invalid_authorization_code(self):
+        response = self.client.post(self.callback_42_url, {"code": "invalid_code"})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("error_message", response.json())
+    
+    @patch("requests.post")
+    def test_oauth_42_with_invalid_access_token(self, mock_post):
+        mock_post.return_value.json.return_value = {"access_token": "mock_invalid_access_token"}
+        
+        response = self.client.post(self.callback_42_url, {"code": "valid_code"})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("error_message", response.json())
