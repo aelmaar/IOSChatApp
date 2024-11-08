@@ -9,8 +9,6 @@ from chat_app.permissions import IsUnauthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
 from django.conf import settings
-from django.shortcuts import redirect
-from urllib.parse import urlencode
 from rest_framework.serializers import ValidationError
 from users.models import Users
 from django.utils.crypto import get_random_string
