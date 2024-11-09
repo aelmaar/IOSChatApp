@@ -24,8 +24,6 @@ class RegisterView(CreateAPIView):
     serializer_class = RegisterSerializer
     queryset = Users.objects.all()
     permission_classes = [IsUnauthenticated]
-
-
 class LoginView(APIView):
     serializer_class = LoginSerializer
     permission_classes = [IsUnauthenticated]
@@ -96,7 +94,9 @@ class OAuthGoogleCallbackView(APIView):
         if not user:
             base_username = username
             while Users.objects.filter(username=username).exists():
-                random_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
+                random_id = "".join(
+                    random.choices(string.ascii_lowercase + string.digits, k=6)
+                )
                 username = f"{base_username}_{random_id}"
 
             password = get_random_string(30)
@@ -133,6 +133,7 @@ class OAuthGoogleCallbackView(APIView):
         if not response.ok:
             return None
         return response.json()
+
 
 class OAuth42CallbackView(APIView):
     permission_classes = [IsUnauthenticated]
@@ -187,17 +188,21 @@ class OAuth42CallbackView(APIView):
             password = get_random_string(30)
             picture = userinfo.get("image").get("versions").get("medium")
 
-            while Users.objects.filter(username=username).exists() or Users.objects.filter(username=f"{username}_{user_id}"):
-                random_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
+            while Users.objects.filter(
+                username=username
+            ).exists() or Users.objects.filter(username=f"{username}_{user_id}"):
+                random_id = "".join(
+                    random.choices(string.ascii_lowercase + string.digits, k=6)
+                )
                 username = f"{base_username}_{random_id}"
-            
+
             user = Users.objects.create_user(
                 username=username,
                 email=email,
                 first_name=userinfo.get("first_name"),
                 last_name=userinfo.get("last_name"),
                 picture=picture,
-                password=password
+                password=password,
             )
         return user
 

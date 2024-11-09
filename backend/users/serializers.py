@@ -9,6 +9,7 @@ from .validators import (
 from django.core.validators import validate_email
 from rest_framework.validators import UniqueValidator
 from django.contrib.auth import authenticate
+from django.conf import settings
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -34,6 +35,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(required=True, validators=[validate_name])
     last_name = serializers.CharField(required=True, validators=[validate_name])
     birthdate = serializers.CharField(required=False, validators=[validate_birthdate])
+    picture = serializers.ImageField(write_only=True)
     password = serializers.CharField(
         style={"input_type": "password"},
         write_only=True,
@@ -42,6 +44,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     confirm_password = serializers.CharField(
         style={"input_type": "password"}, write_only=True
     )
+    picture_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Users
@@ -53,10 +56,18 @@ class RegisterSerializer(serializers.ModelSerializer):
             "last_name",
             "birthdate",
             "picture",
+            "picture_url",
             "password",
             "confirm_password",
         )
         extra_kwargs = {"password": {"write_only": True}}
+
+    def get_picture_url(self, obj):
+        request = self.context.get('request')
+        picture = obj.get('picture')
+        if picture and request:
+            return request.build_absolute_uri(picture)
+        return None
 
     def validate(self, data):
         if data["password"] != data["confirm_password"]:

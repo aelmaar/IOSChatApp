@@ -8,7 +8,7 @@ class Users(AbstractUser):
     first_name = models.CharField(max_length=30, null=False)
     last_name = models.CharField(max_length=30, null=False)
     birthdate = models.DateField(null=True, blank=True)
-    picture = models.URLField(blank=True, null=True)
+    picture = models.ImageField(upload_to="profile_pictures/", blank=True, null=True)
 
     # Avoid clashes with the 'groups' and 'user_permissions' fields in the Django AbstractUser class
     groups = models.ManyToManyField(
