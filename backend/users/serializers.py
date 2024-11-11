@@ -5,12 +5,15 @@ from .validators import (
     validate_password_strength,
     validate_name,
     validate_birthdate,
+    validate_image_size,
 )
 from django.core.validators import validate_email
 from rest_framework.validators import UniqueValidator
 from django.contrib.auth import authenticate
 from django.conf import settings
+import logging
 
+logger = logging.getLogger(__name__)
 
 class RegisterSerializer(serializers.ModelSerializer):
 
@@ -35,7 +38,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(required=True, validators=[validate_name])
     last_name = serializers.CharField(required=True, validators=[validate_name])
     birthdate = serializers.CharField(required=False, validators=[validate_birthdate])
-    picture = serializers.ImageField(write_only=True)
+    picture = serializers.ImageField(write_only=True, validators=[validate_image_size])
     password = serializers.CharField(
         style={"input_type": "password"},
         write_only=True,
@@ -63,10 +66,10 @@ class RegisterSerializer(serializers.ModelSerializer):
         extra_kwargs = {"password": {"write_only": True}}
 
     def get_picture_url(self, obj):
-        request = self.context.get('request')
-        picture = obj.get('picture')
+        request = self.context.get("request")
+        picture = obj.picture
         if picture and request:
-            return request.build_absolute_uri(picture)
+            return request.build_absolute_uri(picture.url)
         return None
 
     def validate(self, data):
@@ -74,21 +77,19 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"password": "Passwords must match."})
         return data
 
-    def save(self):
+    def create(self, validated_data):
         user = Users(
-            email=self.validated_data["email"],
-            username=self.validated_data["username"],
-            first_name=self.validated_data["first_name"],
-            last_name=self.validated_data["last_name"],
-            birthdate=self.validated_data.get("birthdate"),
-            picture=self.validated_data.get("picture"),
+            email= validated_data["email"],
+            username= validated_data["username"],
+            first_name= validated_data["first_name"],
+            last_name= validated_data["last_name"],
+            birthdate= validated_data["birthdate"],
         )
-        password = self.validated_data["password"]
+        user.set_password(validated_data["password"])
+        user.picture = validated_data.get("picture")
 
-        user.set_password(password)
         user.save()
         return user
-
 
 class LoginSerializer(serializers.Serializer):
     username_or_email = serializers.CharField(required=True)
@@ -99,7 +100,11 @@ class LoginSerializer(serializers.Serializer):
         password = attrs.get("password")
 
         if username_or_email and password:
-            user = authenticate(request=self.context.get('request'), username=username_or_email, password=password)
+            user = authenticate(
+                request=self.context.get("request"),
+                username=username_or_email,
+                password=password,
+            )
             if not user:
                 raise serializers.ValidationError(
                     "username/email or password is incorrect"
