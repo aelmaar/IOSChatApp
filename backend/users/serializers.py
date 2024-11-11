@@ -15,6 +15,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class RegisterSerializer(serializers.ModelSerializer):
 
     username = serializers.CharField(
@@ -38,7 +39,9 @@ class RegisterSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(required=True, validators=[validate_name])
     last_name = serializers.CharField(required=True, validators=[validate_name])
     birthdate = serializers.CharField(required=False, validators=[validate_birthdate])
-    picture = serializers.ImageField(write_only=True, validators=[validate_image_size])
+    picture = serializers.ImageField(
+        required=False, validators=[validate_image_size], use_url=True
+    )
     password = serializers.CharField(
         style={"input_type": "password"},
         write_only=True,
@@ -47,7 +50,6 @@ class RegisterSerializer(serializers.ModelSerializer):
     confirm_password = serializers.CharField(
         style={"input_type": "password"}, write_only=True
     )
-    picture_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Users
@@ -59,18 +61,9 @@ class RegisterSerializer(serializers.ModelSerializer):
             "last_name",
             "birthdate",
             "picture",
-            "picture_url",
             "password",
             "confirm_password",
         )
-        extra_kwargs = {"password": {"write_only": True}}
-
-    def get_picture_url(self, obj):
-        request = self.context.get("request")
-        picture = obj.picture
-        if picture and request:
-            return request.build_absolute_uri(picture.url)
-        return None
 
     def validate(self, data):
         if data["password"] != data["confirm_password"]:
@@ -79,17 +72,18 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         user = Users(
-            email= validated_data["email"],
-            username= validated_data["username"],
-            first_name= validated_data["first_name"],
-            last_name= validated_data["last_name"],
-            birthdate= validated_data["birthdate"],
+            email=validated_data["email"],
+            username=validated_data["username"],
+            first_name=validated_data["first_name"],
+            last_name=validated_data["last_name"],
+            birthdate=validated_data["birthdate"],
         )
         user.set_password(validated_data["password"])
         user.picture = validated_data.get("picture")
 
         user.save()
         return user
+
 
 class LoginSerializer(serializers.Serializer):
     username_or_email = serializers.CharField(required=True)
