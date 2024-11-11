@@ -5,3 +5,4 @@ djangorestframework
 djangorestframework-simplejwt
 gunicorn
 requests
+pillow
