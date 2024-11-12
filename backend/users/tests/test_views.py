@@ -4,6 +4,10 @@ from rest_framework import status
 from users.models import Users
 from unittest.mock import patch
 from django.urls import reverse
+from .test_helpers import create_test_image
+from io import BytesIO
+from django.core.files.uploadedfile import SimpleUploadedFile
+import os
 
 
 class RegisterViewTests(TestCase):
@@ -16,7 +20,6 @@ class RegisterViewTests(TestCase):
             "first_name": "Test",
             "last_name": "User",
             "birthdate": "1990-01-01",
-            "picture": "https://example.com/picture.jpg",
             "password": "Swift-1234",
             "confirm_password": "Swift-1234",
         }
@@ -82,6 +85,55 @@ class RegisterViewTests(TestCase):
                     self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
                     field = "password" if field == "confirm_password" else field
                     self.assertEqual(response.data[field][0], error)
+
+    def test_register_view_with_valid_picture_image_size(self):
+        self.user_data["picture"] = create_test_image(1)
+
+        response = self.client.post(self.url, self.user_data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn("picture", response.data)
+        self.assertTrue(response.data["picture"].startswith("http"))
+
+    def test_register_view_with_invalid_image_size(self):
+        self.user_data["picture"] = create_test_image(2)
+
+        response = self.client.post(self.url, self.user_data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["picture"][0], "The image size should not exceed 2MB."
+        )
+
+    def test_register_view_with_invalid_image_format(self):
+        buffer = BytesIO()
+        buffer.write(os.urandom(1024))
+        buffer.seek(0)
+
+        self.user_data["picture"] = SimpleUploadedFile(
+            "test_text.txt", content=buffer.read(), content_type="text/plain"
+        )
+
+        response = self.client.post(self.url, self.user_data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["picture"][0],
+            "Upload a valid image. The file you uploaded was either not an image or a corrupted image.",
+        )
+
+    def test_register_view_with_empty_image_file(self):
+        self.user_data["picture"] = SimpleUploadedFile(
+            "test_text.jpeg", content=None, content_type="image/jpeg"
+        )
+
+        response = self.client.post(self.url, self.user_data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["picture"][0],
+            "The submitted file is empty.",
+        )
 
 
 class LoginViewTests(TestCase):

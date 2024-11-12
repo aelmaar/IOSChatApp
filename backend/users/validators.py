@@ -1,5 +1,4 @@
 from django.core.exceptions import ValidationError
-from .models import Users
 import re
 
 
@@ -52,3 +51,4 @@ def validate_image_size(image):
     max_size = 2 * 1024 * 1024
     if image.size > max_size:
         raise ValidationError("The image size should not exceed 2MB.")
+    return image
