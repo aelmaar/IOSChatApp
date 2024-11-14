@@ -40,24 +40,44 @@ class RegisterViewTests(TestCase):
     def test_register_view_with_multiple_invalid_data(self):
         test_cases = {
             "username": [
+                ("", "This field may not be blank."),
                 ("a", "Username must be at least 5 characters long."),
                 (
                     "testuser!",
                     "Username must contain only alphanumeric characters, underscores, and hyphens.",
                 ),
                 ("differentuser", "This username is already taken."),
+                (
+                    "anouarelmaaroufiejfdjkjldioafiejfajkdvnakjsdvijefij",
+                    "Ensure this field has no more than 30 characters."
+                ),
             ],
             "email": [
+                ("", "This field may not be blank."),
                 ("test", "Enter a valid email address."),
                 ("differentuser@example.com", "This email is already taken."),
+                (
+                    "anouarelmaaroufiejfdjkjldioafiejfajkdvnakjsdvijefijarenvjfnrviaunreuhfairuehfuireafraefnrd@gmail.comm",
+                    "Ensure this field has no more than 100 characters.",
+                ),
             ],
             "first_name": [
+                ("", "This field may not be blank."),
                 ("a", "Name must be at least 2 characters long."),
                 ("Test1", "Name must contain only alphabetic characters."),
+                (
+                    "Anouarefjaiofjdijfiaoejfiojaeiojfioaeajwfiojeoifaewf",
+                    "Ensure this field has no more than 30 characters.",
+                ),
             ],
             "last_name": [
+                ("", "This field may not be blank."),
                 ("l", "Name must be at least 2 characters long."),
                 ("Test2", "Name must contain only alphabetic characters."),
+                (
+                    "El Maaroufifeajfoiejafdsafeuaifhuerhafuorhfuihraeuihgriahah",
+                    "Ensure this field has no more than 30 characters.",
+                ),
             ],
             "birthdate": [
                 (
@@ -264,3 +284,122 @@ class OAuthCallbackViewTests(TestCase):
         response = self.client.post(callback_url, data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("error_message", response.json())
+
+
+class UpdateProfileViewTests(TestCase):
+
+    def setUp(self) -> None:
+        self.url = "/api/update/"
+        self.client = APIClient()
+        self.user_data = {
+            "username": "testuser",
+            "email": "test@example.com",
+            "first_name": "Test",
+            "last_name": "User",
+            "birthdate": "1990-01-01",
+        }
+
+        self.login_credentials = {"username_or_email": "testuser", "password": "Swift-1234"}
+
+        self.user_data["password"] = "Swift-1234"
+        self.user = Users.objects.create_user(**self.user_data)
+        self.user_data.pop("password")
+        # Authenticated the user
+        login = self.client.post("/api/login/", self.login_credentials)
+        self.headers={"Authorization": f"Bearer {login.data.get("access")}"}
+    
+    def test_view_validation_data(self):
+        test_cases = {
+            "username": [
+                ("", "This field may not be blank."),
+                ("a", "Username must be at least 5 characters long."),
+                (
+                    "testuser!",
+                    "Username must contain only alphanumeric characters, underscores, and hyphens.",
+                ),
+                (
+                    "anouarelmaaroufiejfdjkjldioafiejfajkdvnakjsdvijefij",
+                    "Ensure this field has no more than 30 characters."
+                ),
+            ],
+            "email": [
+                ("", "This field may not be blank."),
+                ("test", "Enter a valid email address."),
+                (
+                    "anouarelmaaroufiejfdjkjldioafiejfajkdvnakjsdvijefijarenvjfnrviaunreuhfairuehfuireafraefnrd@gmail.comm",
+                    "Ensure this field has no more than 100 characters.",
+                ),
+            ],
+            "first_name": [
+                ("", "This field may not be blank."),
+                ("a", "Name must be at least 2 characters long."),
+                ("Test1", "Name must contain only alphabetic characters."),
+                (
+                    "Anouarefjaiofjdijfiaoejfiojaeiojfioaeajwfiojeoifaewf",
+                    "Ensure this field has no more than 30 characters.",
+                ),
+            ],
+            "last_name": [
+                ("", "This field may not be blank."),
+                ("l", "Name must be at least 2 characters long."),
+                ("Test2", "Name must contain only alphabetic characters."),
+                (
+                    "El Maaroufifeajfoiejafdsafeuaifhuerhafuorhfuihraeuihgriahah",
+                    "Ensure this field has no more than 30 characters.",
+                ),
+            ],
+            "birthdate": [
+                (
+                    "1990-01-01T00:00:00",
+                    "Date has wrong format. Use one of these formats instead: YYYY-MM-DD.",
+                ),
+                ("1899-01-01", "Year must be greater than 1900."),
+            ],
+        }
+
+
+        for field, cases in test_cases.items():
+            for value, error in cases:
+                with self.subTest(field=field, value=value):
+                    user_data_copy = self.user_data.copy()
+                    user_data_copy[field] = value
+
+                    response = self.client.patch(self.url, user_data_copy, headers=self.headers)
+                    self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                    self.assertEqual(response.data[field][0], error)
+
+    def test_view_for_unauthorized_users(self):
+        response = self.client.patch(self.url, self.user_data)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertIn("detail", response.data)
+
+    def test_update_non_oauth_profile(self):
+        # Update the user data
+        self.user_data["username"] = "differentuser"
+        self.user_data["email"] = "differentuser@example.com"
+        # Update the request with the new data
+        response = self.client.patch(self.url, self.user_data, headers=self.headers)
+        # Assert the response
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, self.user_data)
+
+    def test_update_oauth_profile(self):
+        self.user.IsOAuth = True
+        self.user.save()
+
+        # Update the user data
+        self.user_data["first_name"] = "Different"
+        self.user_data["last_name"] = "User"
+        self.user_data["birthdate"] = "2000-02-06"
+
+        # Update the request with the new data
+        response = self.client.patch(self.url, self.user_data, headers=self.headers)
+        # Assert the response
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, self.user_data)
+
+        # Assert the user data in the database
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, self.user_data["first_name"])
+        self.assertEqual(self.user.last_name, self.user_data["last_name"])
+        self.assertEqual(str(self.user.birthdate), self.user_data["birthdate"])

@@ -1,10 +1,15 @@
-from users.serializers import RegisterSerializer, LoginSerializer
+from users.serializers import (
+    RegisterSerializer,
+    LoginSerializer,
+    UpdateProfileSerializer,
+)
 from django.test import TestCase
 from users.models import Users
 import os
 from .test_helpers import create_test_image
 from io import BytesIO
 from django.core.files.uploadedfile import SimpleUploadedFile
+from unittest.mock import Mock
 
 
 class RegisterSerializerTests(TestCase):
@@ -35,24 +40,44 @@ class RegisterSerializerTests(TestCase):
     def test_serializer_validation_data(self):
         test_cases = {
             "username": [
+                ("", "This field may not be blank."),
                 ("a", "Username must be at least 5 characters long."),
                 (
                     "testuser!",
                     "Username must contain only alphanumeric characters, underscores, and hyphens.",
                 ),
                 ("differentuser", "This username is already taken."),
+                (
+                    "anouarelmaaroufiejfdjkjldioafiejfajkdvnakjsdvijefij",
+                    "Ensure this field has no more than 30 characters."
+                ),
             ],
             "email": [
+                ("", "This field may not be blank."),
                 ("test", "Enter a valid email address."),
                 ("differentuser@example.com", "This email is already taken."),
+                (
+                    "anouarelmaaroufiejfdjkjldioafiejfajkdvnakjsdvijefijarenvjfnrviaunreuhfairuehfuireafraefnrd@gmail.comm",
+                    "Ensure this field has no more than 100 characters.",
+                ),
             ],
             "first_name": [
+                ("", "This field may not be blank."),
                 ("a", "Name must be at least 2 characters long."),
                 ("Test1", "Name must contain only alphabetic characters."),
+                (
+                    "Anouarefjaiofjdijfiaoejfiojaeiojfioaeajwfiojeoifaewf",
+                    "Ensure this field has no more than 30 characters.",
+                ),
             ],
             "last_name": [
+                ("", "This field may not be blank."),
                 ("l", "Name must be at least 2 characters long."),
                 ("Test2", "Name must contain only alphabetic characters."),
+                (
+                    "El Maaroufifeajfoiejafdsafeuaifhuerhafuorhfuihraeuihgriahah",
+                    "Ensure this field has no more than 30 characters.",
+                ),
             ],
             "birthdate": [
                 (
@@ -159,3 +184,117 @@ class LoginSerializerTests(TestCase):
             serializer.errors["non_field_errors"][0],
             "username/email or password is incorrect",
         )
+
+
+class UpdateProfileSerializerTests(TestCase):
+
+    def setUp(self) -> None:
+        self.user_data = {
+            "username": "testuser",
+            "email": "test@example.com",
+            "first_name": "Test",
+            "last_name": "User",
+            "birthdate": "1990-01-01",
+        }
+
+    def test_serializer_validation_data(self):
+        test_cases = {
+            "username": [
+                ("", "This field may not be blank."),
+                ("a", "Username must be at least 5 characters long."),
+                (
+                    "testuser!",
+                    "Username must contain only alphanumeric characters, underscores, and hyphens.",
+                ),
+                (
+                    "anouarelmaaroufiejfdjkjldioafiejfajkdvnakjsdvijefij",
+                    "Ensure this field has no more than 30 characters."
+                ),
+            ],
+            "email": [
+                ("", "This field may not be blank."),
+                ("test", "Enter a valid email address."),
+                (
+                    "anouarelmaaroufiejfdjkjldioafiejfajkdvnakjsdvijefijarenvjfnrviaunreuhfairuehfuireafraefnrd@gmail.comm",
+                    "Ensure this field has no more than 100 characters.",
+                ),
+            ],
+            "first_name": [
+                ("", "This field may not be blank."),
+                ("a", "Name must be at least 2 characters long."),
+                ("Test1", "Name must contain only alphabetic characters."),
+                (
+                    "Anouarefjaiofjdijfiaoejfiojaeiojfioaeajwfiojeoifaewf",
+                    "Ensure this field has no more than 30 characters.",
+                ),
+            ],
+            "last_name": [
+                ("", "This field may not be blank."),
+                ("l", "Name must be at least 2 characters long."),
+                ("Test2", "Name must contain only alphabetic characters."),
+                (
+                    "El Maaroufifeajfoiejafdsafeuaifhuerhafuorhfuihraeuihgriahah",
+                    "Ensure this field has no more than 30 characters.",
+                ),
+            ],
+            "birthdate": [
+                (
+                    "1990-01-01T00:00:00",
+                    "Date has wrong format. Use one of these formats instead: YYYY-MM-DD.",
+                ),
+                ("1899-01-01", "Year must be greater than 1900."),
+            ],
+        }
+
+        for field, cases in test_cases.items():
+            for value, error in cases:
+                with self.subTest(field=field, value=value):
+                    user_data_copy = self.user_data.copy()
+                    user_data_copy[field] = value
+
+                    serializer = UpdateProfileSerializer(data=user_data_copy)
+                    self.assertFalse(serializer.is_valid())
+                    self.assertEqual(serializer.errors[field][0], error)
+
+    def test_serializer_with_not_oauth_profile(self):
+        self.user_data["password"] = "Swift-1234"
+        user = Users.objects.create_user(**self.user_data)
+        self.user_data.pop("password")
+        self.user_data["username"] = "differentuser"
+        self.user_data["email"] = "differentuser@gmail.com"
+
+        mock_request = Mock()
+        mock_request.user = user
+
+        serializer = UpdateProfileSerializer(
+            data=self.user_data, context={"request": mock_request}
+        )
+
+        self.assertTrue(serializer.is_valid(), msg=serializer.errors)
+
+        user = serializer.save()
+        self.assertIsNotNone(user)
+        self.assertEqual(serializer.data, self.user_data)
+
+    def test_serializer_with_oauth_profile(self):
+        self.user_data["password"] = "Swift-1234"
+        self.user_data["IsOAuth"] = True
+        user = Users.objects.create_user(**self.user_data)
+        self.user_data.pop("password")
+        self.user_data.pop("IsOAuth")
+        self.user_data["first_name"] = "Different"
+        self.user_data["last_name"] = "User"
+        self.user_data["birthdate"] = "2000-02-06"
+
+        mock_request = Mock()
+        mock_request.user = user
+
+        serializer = UpdateProfileSerializer(
+            data=self.user_data, context={"request": mock_request}
+        )
+
+        self.assertTrue(serializer.is_valid(), msg=serializer.errors)
+
+        user = serializer.save()
+        self.assertIsNotNone(user)
+        self.assertEqual(serializer.data, self.user_data)
