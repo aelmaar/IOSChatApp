@@ -3,7 +3,12 @@ from rest_framework.generics import CreateAPIView, UpdateAPIView
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .serializers import RegisterSerializer, LoginSerializer, UpdateProfileSerializer
+from .serializers import (
+    RegisterSerializer,
+    LoginSerializer,
+    UpdateProfileSerializer,
+    UpdatePasswordSerializer,
+)
 from .models import Users
 from chat_app.permissions import IsUnauthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -244,4 +249,19 @@ class UpdateProfileView(APIView):
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UpdatePasswordView(APIView):
+
+    def patch(self, request, *args, **kwargs):
+        serializer = UpdatePasswordSerializer(
+            data=request.data, context={"request": request}
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"message": "Password updated successfully"}, status=status.HTTP_200_OK
+            )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -153,3 +153,34 @@ class UpdateProfileSerializer(serializers.ModelSerializer):
         user.save()
 
         return user
+
+
+class UpdatePasswordSerializer(serializers.Serializer):
+
+    new_password = serializers.CharField(
+        required=True,
+        style={"input_type": "password"},
+        validators=[validate_password_strength],
+        write_only=True,
+    )
+
+    confirm_password = serializers.CharField(
+        required=True, style={"input_type": "password"}, write_only=True
+    )
+
+    def validate(self, attrs):
+        user = self.context.get("request").user
+        if attrs["new_password"] != attrs["confirm_password"]:
+            raise serializers.ValidationError({"password": "Passwords must match."})
+        if user.check_password(attrs["new_password"]):
+            raise serializers.ValidationError(
+                {"password": "New password must be different from the old one."}
+            )
+        return attrs
+    
+    def save(self, **kwargs):
+        user = self.context.get('request').user
+        user.set_password(self.validated_data["new_password"])
+
+        user.save()
+        return user
