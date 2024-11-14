@@ -171,13 +171,13 @@ class UpdatePasswordSerializer(serializers.Serializer):
     def validate(self, attrs):
         user = self.context.get("request").user
         if attrs["new_password"] != attrs["confirm_password"]:
-            raise serializers.ValidationError({"password": "Passwords must match."})
+            raise serializers.ValidationError({"new_password": "Passwords must match."})
         if user.check_password(attrs["new_password"]):
             raise serializers.ValidationError(
-                {"password": "New password must be different from the old one."}
+                {"new_password": "New password must be different from the old one."}
             )
         return attrs
-    
+
     def save(self, **kwargs):
         user = self.context.get('request').user
         user.set_password(self.validated_data["new_password"])

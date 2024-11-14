@@ -49,7 +49,7 @@ class RegisterViewTests(TestCase):
                 ("differentuser", "This username is already taken."),
                 (
                     "anouarelmaaroufiejfdjkjldioafiejfajkdvnakjsdvijefij",
-                    "Ensure this field has no more than 30 characters."
+                    "Ensure this field has no more than 30 characters.",
                 ),
             ],
             "email": [
@@ -92,8 +92,8 @@ class RegisterViewTests(TestCase):
                 ("swift-1234", "Password must contain at least one uppercase letter."),
                 ("SWIFT-1234", "Password must contain at least one lowercase letter."),
                 ("Swift1234", "Password must contain at least one special character."),
+                ("Swift-12345", "Passwords must match."),
             ],
-            "confirm_password": [("password", "Passwords must match.")],
         }
 
         for field, cases in test_cases.items():
@@ -289,7 +289,7 @@ class OAuthCallbackViewTests(TestCase):
 class UpdateProfileViewTests(TestCase):
 
     def setUp(self) -> None:
-        self.url = "/api/update/"
+        self.url = "/api/update-profile/"
         self.client = APIClient()
         self.user_data = {
             "username": "testuser",
@@ -299,15 +299,18 @@ class UpdateProfileViewTests(TestCase):
             "birthdate": "1990-01-01",
         }
 
-        self.login_credentials = {"username_or_email": "testuser", "password": "Swift-1234"}
+        self.login_credentials = {
+            "username_or_email": "testuser",
+            "password": "Swift-1234",
+        }
 
         self.user_data["password"] = "Swift-1234"
         self.user = Users.objects.create_user(**self.user_data)
         self.user_data.pop("password")
         # Authenticated the user
         login = self.client.post("/api/login/", self.login_credentials)
-        self.headers={"Authorization": f"Bearer {login.data.get("access")}"}
-    
+        self.headers = {"Authorization": f"Bearer {login.data.get("access")}"}
+
     def test_view_validation_data(self):
         test_cases = {
             "username": [
@@ -319,7 +322,7 @@ class UpdateProfileViewTests(TestCase):
                 ),
                 (
                     "anouarelmaaroufiejfdjkjldioafiejfajkdvnakjsdvijefij",
-                    "Ensure this field has no more than 30 characters."
+                    "Ensure this field has no more than 30 characters.",
                 ),
             ],
             "email": [
@@ -357,14 +360,15 @@ class UpdateProfileViewTests(TestCase):
             ],
         }
 
-
         for field, cases in test_cases.items():
             for value, error in cases:
                 with self.subTest(field=field, value=value):
                     user_data_copy = self.user_data.copy()
                     user_data_copy[field] = value
 
-                    response = self.client.patch(self.url, user_data_copy, headers=self.headers)
+                    response = self.client.patch(
+                        self.url, user_data_copy, headers=self.headers
+                    )
                     self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
                     self.assertEqual(response.data[field][0], error)
 
@@ -403,3 +407,68 @@ class UpdateProfileViewTests(TestCase):
         self.assertEqual(self.user.first_name, self.user_data["first_name"])
         self.assertEqual(self.user.last_name, self.user_data["last_name"])
         self.assertEqual(str(self.user.birthdate), self.user_data["birthdate"])
+
+
+class UpdatePasswordViewTests(TestCase):
+    def setUp(self) -> None:
+        self.client = APIClient()
+        self.url = "/api/update-password/"
+
+        self.new_password_credentials = {
+            "new_password": "Swift-1234",
+            "confirm_password": "Swift-1234",
+        }
+
+        self.user = Users.objects.create_user(
+            username="testuser",
+            email="testuser@gmail.com",
+            first_name="Test",
+            last_name="User",
+            password="Swift-1234",
+        )
+
+        self.login = self.client.post(
+            "/api/login/", {"username_or_email": "testuser", "password": "Swift-1234"}
+        )
+        self.headers = {"Authorization": f"Bearer {self.login.data.get("access")}"}
+
+    def test_view_for_unauthorized_users(self):
+        self.new_password_credentials["new_password"] = "Anouar-1234"
+        self.new_password_credentials["confirm_password"] = "Anouar-1234"
+
+        response = self.client.patch(self.url, self.new_password_credentials)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertIn("detail", response.data)
+
+    def test_view_with_invalid_password_credentials(self):
+        test_cases = [
+            ("Swift-1", "Password must be at least 8 characters long."),
+            ("Swift-Test", "Password must contain at least one number."),
+            ("swift-1234", "Password must contain at least one uppercase letter."),
+            ("SWIFT-1234", "Password must contain at least one lowercase letter."),
+            ("Swift1234", "Password must contain at least one special character."),
+            ("Swift-12345", "Passwords must match."),
+            ("Swift-1234", "New password must be different from the old one.")
+        ]
+
+        for value, error in test_cases:
+            with self.subTest(value=value):
+                new_password_credentials_copy = self.new_password_credentials.copy()
+                new_password_credentials_copy["new_password"] = value
+
+                response = self.client.patch(
+                    self.url, new_password_credentials_copy, headers=self.headers
+                )
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertEqual(response.data["new_password"][0], error)
+
+    def test_successful_password_change(self):
+        self.new_password_credentials["new_password"] = "Anouar-1234"
+        self.new_password_credentials["confirm_password"] = "Anouar-1234"
+
+        response = self.client.patch(
+            self.url, self.new_password_credentials, headers=self.headers
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("message", response.data)

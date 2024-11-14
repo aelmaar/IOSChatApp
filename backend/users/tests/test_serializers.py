@@ -2,6 +2,7 @@ from users.serializers import (
     RegisterSerializer,
     LoginSerializer,
     UpdateProfileSerializer,
+    UpdatePasswordSerializer,
 )
 from django.test import TestCase
 from users.models import Users
@@ -49,7 +50,7 @@ class RegisterSerializerTests(TestCase):
                 ("differentuser", "This username is already taken."),
                 (
                     "anouarelmaaroufiejfdjkjldioafiejfajkdvnakjsdvijefij",
-                    "Ensure this field has no more than 30 characters."
+                    "Ensure this field has no more than 30 characters.",
                 ),
             ],
             "email": [
@@ -92,8 +93,8 @@ class RegisterSerializerTests(TestCase):
                 ("swift-1234", "Password must contain at least one uppercase letter."),
                 ("SWIFT-1234", "Password must contain at least one lowercase letter."),
                 ("Swift1234", "Password must contain at least one special character."),
+                ("Swift-12345", "Passwords must match.")
             ],
-            "confirm_password": [("password", "Passwords must match.")],
         }
 
         for field, cases in test_cases.items():
@@ -208,7 +209,7 @@ class UpdateProfileSerializerTests(TestCase):
                 ),
                 (
                     "anouarelmaaroufiejfdjkjldioafiejfajkdvnakjsdvijefij",
-                    "Ensure this field has no more than 30 characters."
+                    "Ensure this field has no more than 30 characters.",
                 ),
             ],
             "email": [
@@ -298,3 +299,53 @@ class UpdateProfileSerializerTests(TestCase):
         user = serializer.save()
         self.assertIsNotNone(user)
         self.assertEqual(serializer.data, self.user_data)
+
+
+class UpdatePasswordSerializerTests(TestCase):
+    def setUp(self) -> None:
+        self.new_password_credentials = {
+            "new_password": "Swift-1234",
+            "confirm_password": "Swift-1234"
+        }
+
+        self.user = Users.objects.create_user(
+            username="testuser",
+            email="testuser@gmail.com",
+            first_name="Test",
+            last_name="User",
+            password="Swift-1234"
+        )
+
+        self.mock_request = Mock()
+        self.mock_request.user = self.user
+
+    def test_password_validation_data(self):
+        test_cases = [
+            ("Swift-1", "Password must be at least 8 characters long."),
+            ("Swift-Test", "Password must contain at least one number."),
+            ("swift-1234", "Password must contain at least one uppercase letter."),
+            ("SWIFT-1234", "Password must contain at least one lowercase letter."),
+            ("Swift1234", "Password must contain at least one special character."),
+            ("Swift-12345", "Passwords must match."),
+            ("Swift-1234", "New password must be different from the old one.")
+        ]
+
+        for value, error in test_cases:
+            with self.subTest(value=value):
+                new_password_credentials_copy = self.new_password_credentials.copy()
+                new_password_credentials_copy["new_password"] = value
+
+                serializer = UpdatePasswordSerializer(data=new_password_credentials_copy, context={'request': self.mock_request})
+                self.assertFalse(serializer.is_valid())
+                self.assertEqual(serializer.errors["new_password"][0], error)
+
+    def test_valid_password_credentials(self):
+        self.new_password_credentials["new_password"] = "Anouar-1234"
+        self.new_password_credentials["confirm_password"] = "Anouar-1234"
+
+        serializer = UpdatePasswordSerializer(data=self.new_password_credentials, context={'request': self.mock_request})
+        self.assertTrue(serializer.is_valid(), msg=serializer.errors)
+
+        user = serializer.save()
+        self.assertIsNotNone(user)
+        self.assertTrue(user.check_password("Anouar-1234"))
