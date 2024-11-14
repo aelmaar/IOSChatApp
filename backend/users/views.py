@@ -1,9 +1,9 @@
 from django.shortcuts import render
-from rest_framework.generics import CreateAPIView
+from rest_framework.generics import CreateAPIView, UpdateAPIView
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .serializers import RegisterSerializer, LoginSerializer
+from .serializers import RegisterSerializer, LoginSerializer, UpdateProfileSerializer
 from .models import Users
 from chat_app.permissions import IsUnauthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -24,6 +24,8 @@ class RegisterView(CreateAPIView):
     serializer_class = RegisterSerializer
     queryset = Users.objects.all()
     permission_classes = [IsUnauthenticated]
+
+
 class LoginView(APIView):
     serializer_class = LoginSerializer
     permission_classes = [IsUnauthenticated]
@@ -107,6 +109,7 @@ class OAuthGoogleCallbackView(APIView):
                 last_name=userinfo.get("family_name"),
                 password=password,
                 picture=userinfo.get("picture"),
+                IsOAuth=True,
             )
         return user
 
@@ -203,6 +206,7 @@ class OAuth42CallbackView(APIView):
                 last_name=userinfo.get("last_name"),
                 picture=picture,
                 password=password,
+                IsOAuth=True,
             )
         return user
 
@@ -228,3 +232,16 @@ class OAuth42CallbackView(APIView):
         if not response.ok:
             return None
         return response.json()
+
+
+class UpdateProfileView(APIView):
+
+    def patch(self, request, *args, **kwargs):
+        serializer = UpdateProfileSerializer(
+            data=request.data, context={"request": request}
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

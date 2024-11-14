@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 class RegisterSerializer(serializers.ModelSerializer):
 
     username = serializers.CharField(
+        max_length=30,
         required=True,
         validators=[
             validate_username,
@@ -28,6 +29,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         ],
     )
     email = serializers.EmailField(
+        max_length=100,
         required=True,
         validators=[
             validate_email,
@@ -36,8 +38,12 @@ class RegisterSerializer(serializers.ModelSerializer):
             ),
         ],
     )
-    first_name = serializers.CharField(required=True, validators=[validate_name])
-    last_name = serializers.CharField(required=True, validators=[validate_name])
+    first_name = serializers.CharField(
+        max_length=30, required=True, validators=[validate_name]
+    )
+    last_name = serializers.CharField(
+        max_length=30, required=True, validators=[validate_name]
+    )
     birthdate = serializers.CharField(required=False, validators=[validate_birthdate])
     picture = serializers.ImageField(
         required=False, validators=[validate_image_size], use_url=True
@@ -106,3 +112,44 @@ class LoginSerializer(serializers.Serializer):
 
         attrs["user"] = user
         return attrs
+
+
+class UpdateProfileSerializer(serializers.ModelSerializer):
+
+    username = serializers.CharField(
+        max_length=30,
+        required=True,
+        validators=[validate_username],
+    )
+    email = serializers.EmailField(
+        max_length=100,
+        required=True,
+        validators=[validate_email],
+    )
+    first_name = serializers.CharField(
+        max_length=30, required=True, validators=[validate_name]
+    )
+    last_name = serializers.CharField(
+        max_length=30, required=True, validators=[validate_name]
+    )
+    birthdate = serializers.CharField(required=False, validators=[validate_birthdate])
+
+    class Meta:
+
+        model = Users
+        fields = ["username", "email", "first_name", "last_name", "birthdate"]
+
+    def save(self):
+        request = self.context.get("request")
+        email = request.user.email
+        user = Users.objects.get(email=email)
+        if not user.IsOAuth:
+            user.username = self.validated_data.get("username")
+            user.email = self.validated_data.get("email")
+        user.first_name = self.validated_data.get("first_name")
+        user.last_name = self.validated_data.get("last_name")
+        user.birthdate = self.validated_data.get("birthdate")
+
+        user.save()
+
+        return user

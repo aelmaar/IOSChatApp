@@ -4,11 +4,13 @@ from django.contrib.auth.models import Group, Permission
 
 # Create your models here.
 class Users(AbstractUser):
-    email = models.EmailField(unique=True, null=False)
+    username = models.CharField(max_length=30, unique=True, null=False)
+    email = models.EmailField(max_length=100, unique=True, null=False)
     first_name = models.CharField(max_length=30, null=False)
     last_name = models.CharField(max_length=30, null=False)
     birthdate = models.DateField(null=True, blank=True)
     picture = models.ImageField(upload_to="profile_pictures/", blank=True, null=True)
+    IsOAuth = models.BooleanField(default=False)
 
     # Avoid clashes with the 'groups' and 'user_permissions' fields in the Django AbstractUser class
     groups = models.ManyToManyField(
