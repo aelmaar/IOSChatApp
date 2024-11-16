@@ -8,6 +8,7 @@ from .serializers import (
     LoginSerializer,
     UpdateProfileSerializer,
     UpdatePasswordSerializer,
+    UpdatePictureSerializer,
 )
 from .models import Users
 from chat_app.permissions import IsUnauthenticated
@@ -17,6 +18,7 @@ from django.conf import settings
 from rest_framework.serializers import ValidationError
 from users.models import Users
 from django.utils.crypto import get_random_string
+from django.core.files.storage import default_storage
 import requests
 import logging
 import random
@@ -265,3 +267,26 @@ class UpdatePasswordView(APIView):
                 {"message": "Password updated successfully"}, status=status.HTTP_200_OK
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UpdatePictureView(APIView):
+
+    def patch(self, request, *args, **kwargs):
+        serializer = UpdatePictureSerializer(
+            data=request.data, context={"request": request}
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class DeletePictureView(APIView):
+
+    def delete(self, request, *args, **kwargs):
+        user = request.user
+        if user.picture and default_storage.exists(user.picture.path):
+            default_storage.delete(user.picture.path)
+            user.picture = None
+            user.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)

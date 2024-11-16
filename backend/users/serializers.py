@@ -11,6 +11,7 @@ from django.core.validators import validate_email
 from rest_framework.validators import UniqueValidator
 from django.contrib.auth import authenticate
 from django.conf import settings
+from django.core.files.storage import default_storage
 import logging
 
 logger = logging.getLogger(__name__)
@@ -179,8 +180,38 @@ class UpdatePasswordSerializer(serializers.Serializer):
         return attrs
 
     def save(self, **kwargs):
-        user = self.context.get('request').user
+        user = self.context.get("request").user
         user.set_password(self.validated_data["new_password"])
 
         user.save()
         return user
+
+
+class UpdatePictureSerializer(serializers.Serializer):
+
+    new_picture = serializers.ImageField(
+        required=True,
+        validators=[validate_image_size],
+        use_url=True,
+    )
+
+    def save(self, **kwargs):
+        user = self.context.get("request").user
+        old_picture = user.picture
+
+        if old_picture and default_storage.exists(old_picture.path):
+            default_storage.delete(old_picture.path)
+
+        user.picture = self.validated_data["new_picture"]
+        user.save()
+
+        return user
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        request = self.context.get("request")
+        user = request.user
+        representation["new_picture"] = (
+            request.build_absolute_uri(user.picture.url) if user.picture else None
+        )
+        return representation

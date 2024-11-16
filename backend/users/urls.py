@@ -5,6 +5,8 @@ from .views import (
     OAuth42CallbackView,
     UpdateProfileView,
     UpdatePasswordView,
+    UpdatePictureView,
+    DeletePictureView,
 )
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -21,4 +23,6 @@ urlpatterns = [
     path("oauth/42/callback/", OAuth42CallbackView.as_view(), name="oauth-42-callback"),
     path("update-profile/", UpdateProfileView.as_view(), name="update-profile"),
     path("update-password/", UpdatePasswordView.as_view(), name="update-password"),
+    path("update-picture/", UpdatePictureView.as_view(), name="update-picture"),
+    path("delete-picture/", DeletePictureView.as_view(), name="delete-picture"),
 ]
