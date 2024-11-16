@@ -34,6 +34,20 @@ class RegisterView(CreateAPIView):
 
 
 class LoginView(APIView):
+    """
+    LoginView handles user login requests.
+
+    Attributes:
+        serializer_class (LoginSerializer): The serializer class used for validating login data.
+        permission_classes (list): A list of permission classes that the view requires.
+
+    Methods:
+        post(request, *args, **kwargs):
+            Handles POST requests to authenticate a user.
+            Validates the provided data using the serializer.
+            If valid, generates and returns JWT tokens (access and refresh).
+            If invalid, returns validation errors.
+    """
     serializer_class = LoginSerializer
     permission_classes = [IsUnauthenticated]
 
@@ -55,6 +69,27 @@ class LoginView(APIView):
 
 
 class OAuthGoogleCallbackView(APIView):
+    """
+    View to handle the OAuth Google callback.
+
+    This view processes the authorization code received from the OAuth Google
+    provider, exchanges it for an access token, retrieves user information,
+    and logs the user in or creates a new user if necessary.
+
+    Methods
+    -------
+    post(request):
+        Handles the POST request to process the authorization code and log the user in.
+    
+    get_or_create_user(userinfo):
+        Retrieves or creates a user based on the user information from the OAuth Google provider.
+    
+    exchange_code_with_access_token(authorization_code):
+        Exchanges the authorization code for an access token.
+    
+    request_42_userinfo(access_token):
+        Retrieves user information from the OAuth Google provider using the access token.
+    """
     permission_classes = [IsUnauthenticated]
 
     def post(self, request):
@@ -146,6 +181,27 @@ class OAuthGoogleCallbackView(APIView):
 
 
 class OAuth42CallbackView(APIView):
+    """
+    View to handle the OAuth 42 callback.
+
+    This view processes the authorization code received from the OAuth 42
+    provider, exchanges it for an access token, retrieves user information,
+    and logs the user in or creates a new user if necessary.
+
+    Methods
+    -------
+    post(request):
+        Handles the POST request to process the authorization code and log the user in.
+    
+    get_or_create_user(userinfo):
+        Retrieves or creates a user based on the user information from the OAuth 42 provider.
+    
+    exchange_code_with_access_token(authorization_code):
+        Exchanges the authorization code for an access token.
+    
+    request_42_userinfo(access_token):
+        Retrieves user information from the OAuth 42 provider using the access token.
+    """
     permission_classes = [IsUnauthenticated]
 
     def post(self, request):

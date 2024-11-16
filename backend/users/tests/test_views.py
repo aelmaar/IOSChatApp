@@ -11,6 +11,19 @@ import os
 
 
 class RegisterViewTests(TestCase):
+    """
+    Test suite for the RegisterView.
+
+    Test cases:
+    - `test_register_view_with_valid_data`: Tests the view with valid user data.
+    - `test_register_view_with_invalid_data`: Tests the view with various invalid user data scenarios.
+    - `test_register_view_with_valid_picture`: Tests the view with a valid picture field.
+    - `test_register_view_with_invalid_picture`: Tests the view with various invalid picture field scenarios.
+
+    Methods:
+    - `setUp`: Initializes common test data and creates a user in the database to test for unique constraints.
+    - `tearDown`: Cleans up any test images created during the tests.
+    """
     def setUp(self):
         self.client = APIClient()
         self.url = "/api/register/"
@@ -43,7 +56,7 @@ class RegisterViewTests(TestCase):
         response = self.client.post(self.url, self.user_data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-    def test_register_view_with_multiple_invalid_data(self):
+    def test_register_view_with_invalid_data(self):
         test_cases = {
             "username": [
                 ("", "This field may not be blank."),
@@ -111,7 +124,7 @@ class RegisterViewTests(TestCase):
                     self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
                     self.assertEqual(response.data[field][0], error)
 
-    def test_register_view_with_valid_picture_image_size(self):
+    def test_register_view_with_valid_picture(self):
         picture = create_test_image(1)
         self.user_data["picture"] = picture
 
@@ -124,7 +137,7 @@ class RegisterViewTests(TestCase):
 
         self.test_images.append(picture.name)
 
-    def test_register_view_with_invalid_image_data(self):
+    def test_register_view_with_invalid_picture(self):
         buffer = BytesIO()
         buffer.write(os.urandom(1024))
         buffer.seek(0)
@@ -159,7 +172,17 @@ class RegisterViewTests(TestCase):
                 self.test_images.append(value.name)
 
 class LoginViewTests(TestCase):
+    """
+    Test suite for the LoginView.
 
+    Test cases:
+    - `test_view_with_valid_credentials`: Tests the view with valid login credentials.
+    - `test_view_with_invalid_credentials`: Tests the view with invalid login credentials.
+    - `test_view_for_unauthenticated_users_only`: Tests that the view is accessible only by unauthenticated users.
+
+    Methods:
+    - `setUp`: Sets up a test user and credentials for the tests.
+    """
     def setUp(self):
         self.client = APIClient()
         self.url = "/api/login/"
@@ -191,7 +214,7 @@ class LoginViewTests(TestCase):
             "username/email or password is incorrect",
         )
 
-    def test_view_accessible_by_unauthenticated_users_only(self):
+    def test_view_for_unauthenticated_users_only(self):
         authenticate = self.client.post(self.url, self.credentials)
 
         response = self.client.post(
@@ -207,7 +230,19 @@ class LoginViewTests(TestCase):
 
 
 class OAuthCallbackViewTests(TestCase):
+    """
+    Test suite for the OAuthCallbackView.
 
+    Test cases:
+    - `test_oauth_callback_success`: Tests the OAuth callback with valid authorization code. Mocks the requests to exchange the authorization code for an access token and to retrieve user info.
+    - `test_oauth_callback_with_empty_authorization_code`: Tests the OAuth callback with empty authorization code.
+    - `test_oauth_42_invalid_authorization_code`: Tests the OAuth callback with invalid authorization code.
+    - `test_oauth_42_with_invalid_access_token`: Tests the OAuth callback with invalid access token. Mocks the request to exchange the authorization code for an invalid access token.
+
+    Methods:
+    - `setUp`: Sets up the initial data for the tests.
+    - `post_and_assert`: Helper method to post data to the callback URL and assert the response.
+    """
     def setUp(self):
 
         self.client = APIClient()
@@ -289,7 +324,18 @@ class OAuthCallbackViewTests(TestCase):
 
 
 class UpdateProfileViewTests(TestCase):
+    """
+    Test suite for the UpdateProfileView.
 
+    Test cases:
+    - `test_view_with_invalid_data`: Tests the view with various invalid data inputs.
+    - `test_view_for_unauthorized_users`: Tests that the view is not accessible by unauthorized users.
+    - `test_update_non_oauth_profile`: Tests updating a non-OAuth user profile.
+    - `test_update_oauth_profile`: Tests updating an OAuth user profile.
+
+    Methods:
+    - `setUp`: Sets up the initial user data and authentication for the tests.
+    """
     def setUp(self) -> None:
         self.url = "/api/update-profile/"
         self.client = APIClient()
@@ -313,7 +359,7 @@ class UpdateProfileViewTests(TestCase):
         login = self.client.post("/api/login/", self.login_credentials)
         self.headers = {"Authorization": f"Bearer {login.data.get("access")}"}
 
-    def test_view_validation_data(self):
+    def test_view_with_invalid_data(self):
         test_cases = {
             "username": [
                 ("", "This field may not be blank."),
@@ -412,6 +458,17 @@ class UpdateProfileViewTests(TestCase):
 
 
 class UpdatePasswordViewTests(TestCase):
+    """
+    Test suite for the UpdatePasswordView.
+
+    Test cases:
+    - `test_view_for_unauthorized_users`: Tests that the view is not accessible by unauthorized users.
+    - `test_view_with_invalid_password_credentials`: Tests the view with various invalid password scenarios.
+    - `test_successful_password_change`: Tests a successful password change scenario.
+
+    Methods:
+    - `setUp`: Sets up the initial data for the tests, including creating a user and mock request.
+    """
     def setUp(self) -> None:
         self.client = APIClient()
         self.url = "/api/update-password/"
@@ -477,7 +534,18 @@ class UpdatePasswordViewTests(TestCase):
 
 
 class UpdatePictureViewTests(TestCase):
+    """
+    Test suite for the UpdatePictureView.
 
+    Test cases:
+    - `test_view_for_unauthorized_users`: Tests that the view is not accessible by unauthorized users.
+    - `test_view_with_invalid_image_data`: Tests the view with various invalid image data scenarios.
+    - `test_view_with_valid_new_picture`: Tests the view with valid new picture data.
+
+    Methods:
+    - `setUp`: Sets up the test environment by creating a test user and initializing test data.
+    - `tearDown`: Cleans up the test environment by deleting test images after each test.
+    """
     def setUp(self) -> None:
         self.client = APIClient()
         self.url = "/api/update-picture/"
@@ -560,7 +628,17 @@ class UpdatePictureViewTests(TestCase):
 
 
 class DeletePictureViewTests(TestCase):
+    """
+    Test suite for the DeletePictureView.
 
+    Test cases:
+    - `test_view_for_unauthorized_users`: Tests that the view is not accessible by unauthorized users.
+    - `test_view_with_no_picture_to_delete`: Tests the view when there is no picture to delete.
+    - `test_view_with_picture_to_delete`: Tests the view when there is a picture to delete.
+
+    Methods:
+    - `setUp`: Sets up the test environment by creating a test user and initializing test data.
+    """
     def setUp(self) -> None:
         self.client = APIClient()
         self.url = "/api/delete-picture/"

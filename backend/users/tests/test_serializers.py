@@ -15,6 +15,19 @@ from unittest.mock import Mock
 
 
 class RegisterSerializerTests(TestCase):
+    """
+    Test suite for the RegisterSerializer.
+
+    Test cases:
+    - `test_serializer_with_valid_data`: Tests the serializer with valid user data.
+    - `test_serializer_with_invalid_data`: Tests the serializer with various invalid user data scenarios.
+    - `test_valid_picture_field`: Tests the serializer with a valid picture field.
+    - `test_invalid_picture_field`: Tests the serializer with various invalid picture field scenarios.
+
+    Methods:
+    - `setUp`: Initializes common test data and creates a user in the database to test for unique constraints.
+    - `tearDown`: Cleans up any test images created during the tests.
+    """
     def setUp(self):
         self.user_data = {
             "username": "testuser",
@@ -45,7 +58,7 @@ class RegisterSerializerTests(TestCase):
         serializer = RegisterSerializer(data=self.user_data)
         self.assertTrue(serializer.is_valid())
 
-    def test_serializer_validation_data(self):
+    def test_serializer_with_invalid_data(self):
         test_cases = {
             "username": [
                 ("", "This field may not be blank."),
@@ -113,7 +126,7 @@ class RegisterSerializerTests(TestCase):
                     self.assertFalse(serializer.is_valid())
                     self.assertEqual(serializer.errors[field][0], error)
 
-    def test_picture_field_with_valid_image_size(self):
+    def test_valid_picture_field(self):
         picture = create_test_image(1)
         self.user_data["picture"] = picture
 
@@ -128,7 +141,7 @@ class RegisterSerializerTests(TestCase):
 
         self.test_images.append(picture.name)
 
-    def test_picture_field_with_invalid_image_data(self):
+    def test_invalid_picture_field(self):
         buffer = BytesIO()
         buffer.write(os.urandom(1024))
         buffer.seek(0)
@@ -163,6 +176,16 @@ class RegisterSerializerTests(TestCase):
                 self.test_images.append(value.name)
 
 class LoginSerializerTests(TestCase):
+    """
+    Test suite for the LoginSerializer.
+
+    Test cases:
+    - `test_serializer_with_valid_credentials`: Tests that the serializer is valid with correct credentials.
+    - `test_serializer_with_invalid_credentials`: Tests that the serializer is invalid with incorrect credentials.
+
+    Methods:
+    - `setUp`: Sets up a test user and credentials for the tests.
+    """
 
     def setUp(self):
         Users.objects.create_user(
@@ -191,6 +214,17 @@ class LoginSerializerTests(TestCase):
 
 
 class UpdateProfileSerializerTests(TestCase):
+    """
+    Test suite for the UpdateProfileSerializer.
+
+    Test cases:
+    - `test_serializer_with_invalid_data`: Tests the serializer with various invalid data inputs.
+    - `test_valid_non_oauth_profile`: Tests the serializer with valid non-OAuth user data.
+    - `test_valid_oauth_profile`: Tests the serializer with valid OAuth user data.
+
+    Methods:
+    - `setUp`: Sets up the initial user data for the tests.
+    """
 
     def setUp(self) -> None:
         self.user_data = {
@@ -201,7 +235,7 @@ class UpdateProfileSerializerTests(TestCase):
             "birthdate": "1990-01-01",
         }
 
-    def test_serializer_validation_data(self):
+    def test_serializer_with_invalid_data(self):
         test_cases = {
             "username": [
                 ("", "This field may not be blank."),
@@ -260,7 +294,7 @@ class UpdateProfileSerializerTests(TestCase):
                     self.assertFalse(serializer.is_valid())
                     self.assertEqual(serializer.errors[field][0], error)
 
-    def test_serializer_with_not_oauth_profile(self):
+    def test_valid_non_oauth_profile(self):
         self.user_data["password"] = "Swift-1234"
         user = Users.objects.create_user(**self.user_data)
         self.user_data.pop("password")
@@ -280,7 +314,7 @@ class UpdateProfileSerializerTests(TestCase):
         self.assertIsNotNone(user)
         self.assertEqual(serializer.data, self.user_data)
 
-    def test_serializer_with_oauth_profile(self):
+    def test_valid_oauth_profile(self):
         self.user_data["password"] = "Swift-1234"
         self.user_data["IsOAuth"] = True
         user = Users.objects.create_user(**self.user_data)
@@ -305,6 +339,16 @@ class UpdateProfileSerializerTests(TestCase):
 
 
 class UpdatePasswordSerializerTests(TestCase):
+    """
+    Test suite for the UpdatePasswordSerializer.
+
+    Test cases:
+    - `test_invalid_password_data`: Tests various invalid password scenarios.
+    - `test_valid_password_credentials`: Tests a valid password change scenario.
+
+    Methods:
+    - `setUp`: Sets up the initial data for the tests, including creating a user and mock request.
+    """
     def setUp(self) -> None:
         self.new_password_credentials = {
             "new_password": "Swift-1234",
@@ -322,7 +366,7 @@ class UpdatePasswordSerializerTests(TestCase):
         self.mock_request = Mock()
         self.mock_request.user = self.user
 
-    def test_password_validation_data(self):
+    def test_invalid_password_data(self):
         test_cases = [
             ("Swift-1", "Password must be at least 8 characters long."),
             ("Swift-Test", "Password must contain at least one number."),
@@ -360,6 +404,17 @@ class UpdatePasswordSerializerTests(TestCase):
 
 
 class UpdatePictureSerializerTests(TestCase):
+    """
+    Test suite for the UpdatePictureSerializer.
+
+    Test cases:
+    - `test_invalid_new_picture_field`: Tests the serializer with invalid new picture data.
+    - `test_valid_new_picture_field`: Tests the serializer with valid new picture data.
+
+    Methods:
+    - `setUp`: Sets up the test environment by creating a test user and initializing test data.
+    - `tearDown`: Cleans up the test environment by deleting test images after each test.
+    """
     def setUp(self) -> None:
         picture = create_test_image(1)
         self.user = Users.objects.create_user(
@@ -382,7 +437,7 @@ class UpdatePictureSerializerTests(TestCase):
         # Delete the test images after each test
         delete_test_images(self.test_images)
 
-    def test_new_picture_field_with_invalid_image_data(self):
+    def test_invalid_new_picture_field(self):
         buffer = BytesIO()
         buffer.write(os.urandom(1024))
         buffer.seek(0)
@@ -415,7 +470,7 @@ class UpdatePictureSerializerTests(TestCase):
 
                 self.test_images.append(value.name)
 
-    def test_serializer_with_valid_new_picture(self):
+    def test_valid_new_picture_field(self):
         new_picture = create_test_image(1)
         self.new_picture_data["new_picture"] = new_picture
 
