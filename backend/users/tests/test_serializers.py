@@ -3,11 +3,12 @@ from users.serializers import (
     LoginSerializer,
     UpdateProfileSerializer,
     UpdatePasswordSerializer,
+    UpdatePictureSerializer,
 )
 from django.test import TestCase
 from users.models import Users
 import os
-from .test_helpers import create_test_image
+from .test_helpers import create_test_image, delete_test_images
 from io import BytesIO
 from django.core.files.uploadedfile import SimpleUploadedFile
 from unittest.mock import Mock
@@ -33,6 +34,12 @@ class RegisterSerializerTests(TestCase):
             birthdate="1990-01-01",
             password="Swift-1234",
         )
+
+        self.test_images = []
+
+    def tearDown(self) -> None:
+        # Delete test images
+        delete_test_images(self.test_images)
 
     def test_serializer_with_valid_data(self):
         serializer = RegisterSerializer(data=self.user_data)
@@ -93,7 +100,7 @@ class RegisterSerializerTests(TestCase):
                 ("swift-1234", "Password must contain at least one uppercase letter."),
                 ("SWIFT-1234", "Password must contain at least one lowercase letter."),
                 ("Swift1234", "Password must contain at least one special character."),
-                ("Swift-12345", "Passwords must match.")
+                ("Swift-12345", "Passwords must match."),
             ],
         }
 
@@ -104,13 +111,14 @@ class RegisterSerializerTests(TestCase):
                     user_data_copy[field] = value
                     serializer = RegisterSerializer(data=user_data_copy)
                     self.assertFalse(serializer.is_valid())
-                    field = "password" if field == "confirm_password" else field
                     self.assertEqual(serializer.errors[field][0], error)
 
     def test_picture_field_with_valid_image_size(self):
-        self.user_data["picture"] = create_test_image(1)
+        picture = create_test_image(1)
+        self.user_data["picture"] = picture
 
         serializer = RegisterSerializer(data=self.user_data)
+
 
         self.assertTrue(serializer.is_valid(), msg=serializer.errors)
 
@@ -118,46 +126,41 @@ class RegisterSerializerTests(TestCase):
         self.assertIsNotNone(user.picture)
         self.assertIn("picture", serializer.data)
 
-    def test_picture_field_with_invalid_image_size(self):
-        self.user_data["picture"] = create_test_image(2)
+        self.test_images.append(picture.name)
 
-        serializer = RegisterSerializer(data=self.user_data)
-
-        self.assertFalse(serializer.is_valid(), msg=serializer.errors)
-        self.assertEqual(
-            serializer.errors["picture"][0], "The image size should not exceed 2MB."
-        )
-
-    def test_picture_field_with_invalid_image_format(self):
+    def test_picture_field_with_invalid_image_data(self):
         buffer = BytesIO()
         buffer.write(os.urandom(1024))
         buffer.seek(0)
 
-        self.user_data["picture"] = SimpleUploadedFile(
-            "test_text.txt", content=buffer.read(), content_type="text/plain"
-        )
+        test_cases = [
+            (create_test_image(2), "The image size should not exceed 2MB."),
+            (
+                SimpleUploadedFile(
+                    "test_text.txt", content=buffer.read(), content_type="text/plain"
+                ),
+                "Upload a valid image. The file you uploaded was either not an image or a corrupted image.",
+            ),
+            (
+                SimpleUploadedFile(
+                    "test_text.jpeg", content=None, content_type="image/jpeg"
+                ),
+                "The submitted file is empty.",
+            ),
+        ]
 
-        serializer = RegisterSerializer(data=self.user_data)
+        for value, error in test_cases:
+            with self.subTest():
+                user_data_copy = self.user_data.copy()
+                user_data_copy["picture"] = value
 
-        self.assertFalse(serializer.is_valid(), msg=serializer.errors)
-        self.assertEqual(
-            serializer.errors["picture"][0],
-            "Upload a valid image. The file you uploaded was either not an image or a corrupted image.",
-        )
+                serializer = RegisterSerializer(data=user_data_copy)
 
-    def test_picture_field_with_empty_image_file(self):
-        self.user_data["picture"] = SimpleUploadedFile(
-            "test_text.jpeg", content=None, content_type="image/jpeg"
-        )
 
-        serializer = RegisterSerializer(data=self.user_data)
+                self.assertFalse(serializer.is_valid(), msg=serializer.errors)
+                self.assertEqual(serializer.errors["picture"][0], error)
 
-        self.assertFalse(serializer.is_valid(), msg=serializer.errors)
-        self.assertEqual(
-            serializer.errors["picture"][0],
-            "The submitted file is empty.",
-        )
-
+                self.test_images.append(value.name)
 
 class LoginSerializerTests(TestCase):
 
@@ -305,7 +308,7 @@ class UpdatePasswordSerializerTests(TestCase):
     def setUp(self) -> None:
         self.new_password_credentials = {
             "new_password": "Swift-1234",
-            "confirm_password": "Swift-1234"
+            "confirm_password": "Swift-1234",
         }
 
         self.user = Users.objects.create_user(
@@ -313,7 +316,7 @@ class UpdatePasswordSerializerTests(TestCase):
             email="testuser@gmail.com",
             first_name="Test",
             last_name="User",
-            password="Swift-1234"
+            password="Swift-1234",
         )
 
         self.mock_request = Mock()
@@ -327,7 +330,7 @@ class UpdatePasswordSerializerTests(TestCase):
             ("SWIFT-1234", "Password must contain at least one lowercase letter."),
             ("Swift1234", "Password must contain at least one special character."),
             ("Swift-12345", "Passwords must match."),
-            ("Swift-1234", "New password must be different from the old one.")
+            ("Swift-1234", "New password must be different from the old one."),
         ]
 
         for value, error in test_cases:
@@ -335,7 +338,10 @@ class UpdatePasswordSerializerTests(TestCase):
                 new_password_credentials_copy = self.new_password_credentials.copy()
                 new_password_credentials_copy["new_password"] = value
 
-                serializer = UpdatePasswordSerializer(data=new_password_credentials_copy, context={'request': self.mock_request})
+                serializer = UpdatePasswordSerializer(
+                    data=new_password_credentials_copy,
+                    context={"request": self.mock_request},
+                )
                 self.assertFalse(serializer.is_valid())
                 self.assertEqual(serializer.errors["new_password"][0], error)
 
@@ -343,9 +349,84 @@ class UpdatePasswordSerializerTests(TestCase):
         self.new_password_credentials["new_password"] = "Anouar-1234"
         self.new_password_credentials["confirm_password"] = "Anouar-1234"
 
-        serializer = UpdatePasswordSerializer(data=self.new_password_credentials, context={'request': self.mock_request})
+        serializer = UpdatePasswordSerializer(
+            data=self.new_password_credentials, context={"request": self.mock_request}
+        )
         self.assertTrue(serializer.is_valid(), msg=serializer.errors)
 
         user = serializer.save()
         self.assertIsNotNone(user)
         self.assertTrue(user.check_password("Anouar-1234"))
+
+
+class UpdatePictureSerializerTests(TestCase):
+    def setUp(self) -> None:
+        picture = create_test_image(1)
+        self.user = Users.objects.create_user(
+            username="testuser",
+            email="testuser@gmail.com",
+            first_name="Test",
+            last_name="User",
+            picture=picture,
+            password="Swift-1234",
+        )
+
+        self.mock_request = Mock()
+        self.mock_request.user = self.user
+
+        self.new_picture_data = {}
+
+        self.test_images = [picture.name]
+
+    def tearDown(self) -> None:
+        # Delete the test images after each test
+        delete_test_images(self.test_images)
+
+    def test_new_picture_field_with_invalid_image_data(self):
+        buffer = BytesIO()
+        buffer.write(os.urandom(1024))
+        buffer.seek(0)
+
+        test_cases = [
+            (create_test_image(2), "The image size should not exceed 2MB."),
+            (
+                SimpleUploadedFile(
+                    "test_text.txt", content=buffer.read(), content_type="text/plain"
+                ),
+                "Upload a valid image. The file you uploaded was either not an image or a corrupted image.",
+            ),
+            (
+                SimpleUploadedFile(
+                    "test_text.jpeg", content=None, content_type="image/jpeg"
+                ),
+                "The submitted file is empty.",
+            ),
+        ]
+
+        for value, error in test_cases:
+            with self.subTest():
+                self.new_picture_data["new_picture"] = value
+
+                serializer = UpdatePictureSerializer(data=self.new_picture_data)
+
+
+                self.assertFalse(serializer.is_valid(), msg=serializer.errors)
+                self.assertEqual(serializer.errors["new_picture"][0], error)
+
+                self.test_images.append(value.name)
+
+    def test_serializer_with_valid_new_picture(self):
+        new_picture = create_test_image(1)
+        self.new_picture_data["new_picture"] = new_picture
+
+        serializer = UpdatePictureSerializer(
+            data=self.new_picture_data, context={"request": self.mock_request}
+        )
+
+        self.assertTrue(serializer.is_valid(), msg=serializer.errors)
+
+        user = serializer.save()
+        self.assertIsNotNone(user)
+        self.assertIn("new_picture", serializer.data)
+
+        self.test_images.append(new_picture.name)

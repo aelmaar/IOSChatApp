@@ -4,7 +4,7 @@ from rest_framework import status
 from users.models import Users
 from unittest.mock import patch
 from django.urls import reverse
-from .test_helpers import create_test_image
+from .test_helpers import create_test_image, delete_test_images
 from io import BytesIO
 from django.core.files.uploadedfile import SimpleUploadedFile
 import os
@@ -32,6 +32,12 @@ class RegisterViewTests(TestCase):
             birthdate="1990-01-01",
             password="Swift-1234",
         )
+
+        self.test_images = []
+
+    def tearDown(self) -> None:
+        # Delete test images
+        delete_test_images(self.test_images)
 
     def test_register_view_with_valid_data(self):
         response = self.client.post(self.url, self.user_data)
@@ -103,58 +109,54 @@ class RegisterViewTests(TestCase):
                     user_data_copy[field] = value
                     response = self.client.post(self.url, user_data_copy)
                     self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-                    field = "password" if field == "confirm_password" else field
                     self.assertEqual(response.data[field][0], error)
 
     def test_register_view_with_valid_picture_image_size(self):
-        self.user_data["picture"] = create_test_image(1)
+        picture = create_test_image(1)
+        self.user_data["picture"] = picture
 
         response = self.client.post(self.url, self.user_data)
+
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertIn("picture", response.data)
         self.assertTrue(response.data["picture"].startswith("http"))
 
-    def test_register_view_with_invalid_image_size(self):
-        self.user_data["picture"] = create_test_image(2)
+        self.test_images.append(picture.name)
 
-        response = self.client.post(self.url, self.user_data)
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            response.data["picture"][0], "The image size should not exceed 2MB."
-        )
-
-    def test_register_view_with_invalid_image_format(self):
+    def test_register_view_with_invalid_image_data(self):
         buffer = BytesIO()
         buffer.write(os.urandom(1024))
         buffer.seek(0)
 
-        self.user_data["picture"] = SimpleUploadedFile(
-            "test_text.txt", content=buffer.read(), content_type="text/plain"
-        )
+        test_cases = [
+            (create_test_image(2), "The image size should not exceed 2MB."),
+            (
+                SimpleUploadedFile(
+                    "test_text.txt", content=buffer.read(), content_type="text/plain"
+                ),
+                "Upload a valid image. The file you uploaded was either not an image or a corrupted image.",
+            ),
+            (
+                SimpleUploadedFile(
+                    "test_text.jpeg", content=None, content_type="image/jpeg"
+                ),
+                "The submitted file is empty.",
+            ),
+        ]
 
-        response = self.client.post(self.url, self.user_data)
+        for value, error in test_cases:
+            with self.subTest():
+                user_data_copy = self.user_data.copy()
+                user_data_copy["picture"] = value
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            response.data["picture"][0],
-            "Upload a valid image. The file you uploaded was either not an image or a corrupted image.",
-        )
+                response = self.client.post(self.url, user_data_copy)
 
-    def test_register_view_with_empty_image_file(self):
-        self.user_data["picture"] = SimpleUploadedFile(
-            "test_text.jpeg", content=None, content_type="image/jpeg"
-        )
 
-        response = self.client.post(self.url, self.user_data)
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertEqual(response.data["picture"][0], error)
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            response.data["picture"][0],
-            "The submitted file is empty.",
-        )
-
+                self.test_images.append(value.name)
 
 class LoginViewTests(TestCase):
 
@@ -448,7 +450,7 @@ class UpdatePasswordViewTests(TestCase):
             ("SWIFT-1234", "Password must contain at least one lowercase letter."),
             ("Swift1234", "Password must contain at least one special character."),
             ("Swift-12345", "Passwords must match."),
-            ("Swift-1234", "New password must be different from the old one.")
+            ("Swift-1234", "New password must be different from the old one."),
         ]
 
         for value, error in test_cases:
@@ -472,3 +474,126 @@ class UpdatePasswordViewTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("message", response.data)
+
+
+class UpdatePictureViewTests(TestCase):
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+        self.url = "/api/update-picture/"
+
+        self.user = Users.objects.create_user(
+            username="testuser",
+            email="testuser@gmail.com",
+            first_name="Test",
+            last_name="User",
+            password="Swift-1234",
+        )
+
+        self.login = self.client.post(
+            "/api/login/", {"username_or_email": "testuser", "password": "Swift-1234"}
+        )
+        self.headers = {"Authorization": f"Bearer {self.login.data.get("access")}"}
+
+        self.new_picture_data = {}
+        self.test_images = []
+
+    def tearDown(self) -> None:
+        # Delete test images
+        delete_test_images(self.test_images)
+
+    def test_view_for_unauthorized_users(self):
+        new_picture = create_test_image(1)
+
+        response = self.client.patch(self.url, {"new_picture": new_picture})
+
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertIn("detail", response.data)
+
+        self.test_images.append(new_picture.name)
+
+    def test_view_with_invalid_image_data(self):
+        buffer = BytesIO()
+        buffer.write(os.urandom(1024))
+        buffer.seek(0)
+
+        test_cases = [
+            (create_test_image(2), "The image size should not exceed 2MB."),
+            (
+                SimpleUploadedFile(
+                    "test_text.txt", content=buffer.read(), content_type="text/plain"
+                ),
+                "Upload a valid image. The file you uploaded was either not an image or a corrupted image.",
+            ),
+            (
+                SimpleUploadedFile(
+                    "test_text.jpeg", content=None, content_type="image/jpeg"
+                ),
+                "The submitted file is empty.",
+            ),
+        ]
+
+        for value, error in test_cases:
+            with self.subTest():
+                response = self.client.patch(
+                    self.url, {"new_picture": value}, headers=self.headers
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertEqual(response.data["new_picture"][0], error)
+
+                self.test_images.append(value.name)
+
+    def test_view_with_valid_new_picture(self):
+        new_picture = create_test_image(1)
+
+        response = self.client.patch(
+            self.url, {"new_picture": new_picture}, headers=self.headers
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("new_picture", response.data)
+        self.assertTrue(response.data["new_picture"].startswith("http"))
+
+        self.test_images.append(new_picture.name)
+
+
+class DeletePictureViewTests(TestCase):
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+        self.url = "/api/delete-picture/"
+
+        self.user = Users.objects.create_user(
+            username="testuser",
+            email="testuser@example.com",
+            first_name="Test",
+            last_name="User",
+            password="Swift-1234",
+        )
+
+        self.login = self.client.post(
+            "/api/login/", {"username_or_email": "testuser", "password": "Swift-1234"}
+        )
+        self.headers = {"Authorization": f"Bearer {self.login.data.get('access')}"}
+    
+    def test_view_for_unauthorized_users(self):
+        response = self.client.delete(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertIn("detail", response.data)
+    
+    def test_view_with_no_picture_to_delete(self):
+        response = self.client.delete(self.url, headers=self.headers)
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+    
+    def test_view_with_picture_to_delete(self):
+        self.user.picture = create_test_image(1)
+        self.user.save()
+
+        response = self.client.delete(self.url, headers=self.headers)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.picture.name, '')
