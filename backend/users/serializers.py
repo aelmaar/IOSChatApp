@@ -17,6 +17,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class UsersSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Users
+        fields = ['username', 'first_name', 'last_name', 'birthdate', 'picture']
+        read_only_fields = fields
+
 class RegisterSerializer(serializers.ModelSerializer):
     """
     Serializer for user registration.

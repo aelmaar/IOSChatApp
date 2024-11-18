@@ -4,6 +4,7 @@ from users.serializers import (
     UpdateProfileSerializer,
     UpdatePasswordSerializer,
     UpdatePictureSerializer,
+    UsersSerializer,
 )
 from django.test import TestCase
 from users.models import Users
@@ -28,6 +29,7 @@ class RegisterSerializerTests(TestCase):
     - `setUp`: Initializes common test data and creates a user in the database to test for unique constraints.
     - `tearDown`: Cleans up any test images created during the tests.
     """
+
     def setUp(self):
         self.user_data = {
             "username": "testuser",
@@ -132,7 +134,6 @@ class RegisterSerializerTests(TestCase):
 
         serializer = RegisterSerializer(data=self.user_data)
 
-
         self.assertTrue(serializer.is_valid(), msg=serializer.errors)
 
         user = serializer.save()
@@ -169,11 +170,11 @@ class RegisterSerializerTests(TestCase):
 
                 serializer = RegisterSerializer(data=user_data_copy)
 
-
                 self.assertFalse(serializer.is_valid(), msg=serializer.errors)
                 self.assertEqual(serializer.errors["picture"][0], error)
 
                 self.test_images.append(value.name)
+
 
 class LoginSerializerTests(TestCase):
     """
@@ -349,6 +350,7 @@ class UpdatePasswordSerializerTests(TestCase):
     Methods:
     - `setUp`: Sets up the initial data for the tests, including creating a user and mock request.
     """
+
     def setUp(self) -> None:
         self.new_password_credentials = {
             "new_password": "Swift-1234",
@@ -415,6 +417,7 @@ class UpdatePictureSerializerTests(TestCase):
     - `setUp`: Sets up the test environment by creating a test user and initializing test data.
     - `tearDown`: Cleans up the test environment by deleting test images after each test.
     """
+
     def setUp(self) -> None:
         picture = create_test_image(1)
         self.user = Users.objects.create_user(
@@ -464,7 +467,6 @@ class UpdatePictureSerializerTests(TestCase):
 
                 serializer = UpdatePictureSerializer(data=self.new_picture_data)
 
-
                 self.assertFalse(serializer.is_valid(), msg=serializer.errors)
                 self.assertEqual(serializer.errors["new_picture"][0], error)
 
@@ -485,3 +487,24 @@ class UpdatePictureSerializerTests(TestCase):
         self.assertIn("new_picture", serializer.data)
 
         self.test_images.append(new_picture.name)
+
+
+class UsersSerializerTests(TestCase):
+
+    def test_display_user_info(self):
+        picture = create_test_image(1)
+        user = Users.objects.create_user(
+            username="testuser",
+            email="testuser@gmail.com",
+            first_name="Test",
+            last_name="User",
+            picture=picture,
+            password="Swift-1234",
+        )
+
+        serializer = UsersSerializer(user)
+        self.assertEqual(serializer.data["username"], user.username)
+        self.assertEqual(serializer.data["first_name"], user.first_name)
+        self.assertEqual(serializer.data["last_name"], user.last_name)
+        self.assertEqual(serializer.data["birthdate"], user.birthdate)
+        self.assertEqual(serializer.data["picture"], user.picture.url)
