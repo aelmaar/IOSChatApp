@@ -38,7 +38,7 @@ class FriendshipsSerializerTests(TestCase):
                 self.assertFalse(serializer.is_valid(), msg=serializer.errors)
                 self.assertEqual(serializer.errors["friend_username"][0], error)
 
-    def test_invalidate_self_friendship(self):
+    def test_cannot_create_self_friendships(self):
         serializer = FriendshipsSerializer(
             data={"friend_username": self.user.username},
             context={"request": self.mock_request},
@@ -50,7 +50,7 @@ class FriendshipsSerializerTests(TestCase):
             "You cannot be friends with yourself.",
         )
 
-    def test_not_existing_friend_username(self):
+    def test_with_not_existing_friend_username(self):
 
         with self.assertRaises(Http404):
             serializer = FriendshipsSerializer(
