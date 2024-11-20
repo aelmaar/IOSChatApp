@@ -1,4 +1,4 @@
-from .models import Users
+from .models import Users, Blacklist
 from rest_framework import serializers
 from .validators import (
     validate_username,
@@ -12,6 +12,7 @@ from rest_framework.validators import UniqueValidator
 from django.contrib.auth import authenticate
 from django.conf import settings
 from django.core.files.storage import default_storage
+from django.shortcuts import get_object_or_404
 import logging
 
 logger = logging.getLogger(__name__)
@@ -21,8 +22,9 @@ class UsersSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Users
-        fields = ['username', 'first_name', 'last_name', 'birthdate', 'picture']
+        fields = ["username", "first_name", "last_name", "birthdate", "picture"]
         read_only_fields = fields
+
 
 class RegisterSerializer(serializers.ModelSerializer):
     """
@@ -297,3 +299,62 @@ class UpdatePictureSerializer(serializers.Serializer):
             request.build_absolute_uri(user.picture.url) if user.picture else None
         )
         return representation
+
+
+class BlacklistSerializer(serializers.ModelSerializer):
+    """
+    Serializer for blocking and unblocking users.
+
+    Fields:
+        blocked_username (str): The username of the user to be blocked. Required. Max length 30.
+        blocked_user (UsersSerializer): The user instance of the blocked user. Read-only.
+        created_at (DateTimeField): The date and time when the user was blocked. Read-only.
+
+    Methods:
+        validate_blocked_username(value):
+            Validates that the user is not trying to block themselves.
+
+        validate(attrs):
+            Validates that the user is not trying to block a user that is already blocked.
+            Adds the user and blocked user instances to the validated data.
+
+        save():
+            Creates a new Blacklist instance and returns it.
+
+    """
+
+    blocked_username = serializers.CharField(
+        required=True, max_length=30, write_only=True
+    )
+
+    blocked_user = UsersSerializer(read_only=True)
+
+    class Meta:
+        model = Blacklist
+        fields = ["blocked_user", "created_at", "blocked_username"]
+        read_only_fields = ["blocked_user", "created_at"]
+
+    def validate_blocked_username(self, value):
+        user = self.context.get("request").user
+        if user.username == value:
+            raise serializers.ValidationError("You cannot block or unblock yourself.")
+        return value
+
+    def validate(self, attrs):
+        user = self.context.get("request").user
+
+        blocked_user = get_object_or_404(Users, username=attrs["blocked_username"])
+
+        if Blacklist.objects.filter(user=user, blocked_user=blocked_user).exists():
+            raise serializers.ValidationError("User is already blocked.")
+
+        attrs["blocked_user"] = blocked_user
+        return attrs
+
+    def save(self):
+        user = self.context.get("request").user
+        blocked_user = self.validated_data["blocked_user"]
+
+        blacklist = Blacklist.objects.create(user=user, blocked_user=blocked_user)
+
+        return blacklist
