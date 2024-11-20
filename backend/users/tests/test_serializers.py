@@ -4,15 +4,17 @@ from users.serializers import (
     UpdateProfileSerializer,
     UpdatePasswordSerializer,
     UpdatePictureSerializer,
+    BlacklistSerializer,
     UsersSerializer,
 )
 from django.test import TestCase
-from users.models import Users
+from users.models import Users, Blacklist
 import os
 from .test_helpers import create_test_image, delete_test_images
 from io import BytesIO
 from django.core.files.uploadedfile import SimpleUploadedFile
 from unittest.mock import Mock
+from django.http import Http404
 
 
 class RegisterSerializerTests(TestCase):
@@ -508,3 +510,105 @@ class UsersSerializerTests(TestCase):
         self.assertEqual(serializer.data["last_name"], user.last_name)
         self.assertEqual(serializer.data["birthdate"], user.birthdate)
         self.assertEqual(serializer.data["picture"], user.picture.url)
+
+
+class BlacklistSerializerTests(TestCase):
+
+    def setUp(self) -> None:
+        self.user = Users.objects.create_user(
+            username="testuser",
+            email="testuser@example.com",
+            first_name="Test",
+            last_name="User",
+            birthdate="1990-01-01",
+            password="Swift-1234",
+        )
+
+        self.mock_request = Mock()
+        self.mock_request.user = self.user
+
+    def test_blocked_username_with_invalid_data(self):
+        test_cases = [
+            ("", "This field may not be blank."),
+            (
+                "anouarelmaaroufiejfdjkjldioafiejfajkdvnakjsdvijefij",
+                "Ensure this field has no more than 30 characters.",
+            ),
+        ]
+
+        for value, error in test_cases:
+            with self.subTest():
+                serializer = BlacklistSerializer(data={"blocked_username": value})
+                self.assertFalse(serializer.is_valid(), msg=serializer.errors)
+                self.assertEqual(serializer.errors["blocked_username"][0], error)
+
+    def test_cannot_block_or_unblock_oneself(self):
+        serializer = BlacklistSerializer(
+            data={"blocked_username": self.user.username},
+            context={"request": self.mock_request},
+        )
+
+        self.assertFalse(serializer.is_valid(), msg=serializer.errors)
+        self.assertEqual(
+            serializer.errors["blocked_username"][0],
+            "You cannot block or unblock yourself.",
+        )
+
+    def test_with_not_existing_blocked_username(self):
+        with self.assertRaises(Http404):
+            serializer = BlacklistSerializer(
+                data={"blocked_username": "notexistinguser"},
+                context={"request": self.mock_request},
+            )
+
+            self.assertFalse(serializer.is_valid(), msg=serializer.errors)
+
+    def test_blocking_an_already_blocked_user(self):
+        blocked_user = Users.objects.create_user(
+            username="blockeduser",
+            email="blockeduser@example.com",
+            first_name="Blocked",
+            last_name="User",
+            birthdate="1990-01-01",
+            password="Swift-1234",
+        )
+
+        Blacklist.objects.create(user=self.user, blocked_user=blocked_user)
+
+        serializer = BlacklistSerializer(
+            data={"blocked_username": blocked_user.username},
+            context={"request": self.mock_request},
+        )
+
+        self.assertFalse(serializer.is_valid(), msg=serializer.errors)
+
+        self.assertEqual(
+            serializer.errors["non_field_errors"][0], "User is already blocked."
+        )
+
+    def test_blocking_a_user(self):
+        blocked_user = Users.objects.create_user(
+            username="blockeduser",
+            email="blockeduser@example.com",
+            first_name="Blocked",
+            last_name="User",
+            birthdate="1990-01-01",
+            password="Swift-1234",
+        )
+
+        serializer = BlacklistSerializer(
+            data={"blocked_username": blocked_user.username},
+            context={"request": self.mock_request},
+        )
+
+        self.assertTrue(serializer.is_valid(), msg=serializer.errors)
+
+        blacklist = serializer.save()
+        self.assertIsNotNone(blacklist)
+
+        self.assertEqual(blacklist.user, self.user)
+        self.assertEqual(blacklist.blocked_user, blocked_user)
+
+        self.assertEqual(
+            serializer.data["blocked_user"], UsersSerializer(blocked_user).data
+        )
