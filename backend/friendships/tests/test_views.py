@@ -392,7 +392,7 @@ class AcceptRejectFriendshipsViewTests(TestCase):
             response.data["detail"], "No Friendships matches the given query."
         )
 
-    def test_accept_friendships_with_not_pending_friendships(self):
+    def test_accept_friendships_with_already_accepted_friendship(self):
         login_credentials = {
             "username_or_email": "anotheruser",
             "password": "Swift-1234",
@@ -410,7 +410,7 @@ class AcceptRejectFriendshipsViewTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(
             response.data["detail"],
-            "You cannot perform this action on this friendship.",
+            "The friendship has already been accepted.",
         )
 
 

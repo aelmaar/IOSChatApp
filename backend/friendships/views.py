@@ -52,10 +52,10 @@ class FriendshipsView(APIView):
             )
         if friendship.status != Friendships.PENDING:
             return Response(
-                {"detail": "You cannot perform this action on this friendship."},
+                {"detail": "The friendship has already been accepted."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
+        
         action = request.data.get("action")
         if action == "accept":
             friendship.status = Friendships.ACCEPTED
