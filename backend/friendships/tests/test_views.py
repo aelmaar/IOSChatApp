@@ -168,6 +168,31 @@ class ListRetrieveFriendshipsViewTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
+    def test_retrieving_friendship_with_unauthorized_user(self):
+        Users.objects.create_user(
+            username="unauthorizeduser",
+            email="unauthorizeduser@example.com",
+            first_name="Unauthorized",
+            last_name="User",
+            birthdate="1990-01-01",
+            password="Swift-1234",
+        )
+
+        login_credentials = {
+            "username_or_email": "unauthorizeduser",
+            "password": "Swift-1234",
+        }
+        login = self.client.post("/api/login/", login_credentials)
+        headers = {"Authorization": f"Bearer {login.data.get('access')}"}
+
+        response = self.client.get(f"{self.url}{self.friendship.id}/", headers=headers)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(
+            response.data["detail"],
+            "You do not have permission to perform this action.",
+        )
+
     def test_retrieving_not_existing_friendships(self):
         response = self.client.get(f"{self.url}100000/", headers=self.headers)
 
@@ -215,6 +240,7 @@ class ListRetrieveFriendshipsViewTests(TestCase):
         self.assertEqual(response.data[0]["pending_action"], "waiting_for_response")
         self.assertEqual(response.data[1]["pending_action"], "accept_or_reject")
 
+
 class AcceptRejectFriendshipsViewTests(TestCase):
 
     def setUp(self) -> None:
@@ -240,7 +266,9 @@ class AcceptRejectFriendshipsViewTests(TestCase):
         )
 
         # Create a friendship
-        self.friendship = Friendships.objects.create(user1=self.user, user2=another_user)
+        self.friendship = Friendships.objects.create(
+            user1=self.user, user2=another_user
+        )
 
         login_credentials = {"username_or_email": "testuser", "password": "Swift-1234"}
         login = self.client.post("/api/login/", login_credentials)
@@ -252,64 +280,246 @@ class AcceptRejectFriendshipsViewTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_unauthorized_accept_reject_friendships(self):
-        response = self.client.patch(f"{self.url}{self.friendship.id}/", {"action": "accept"}, headers=self.headers)
+        response = self.client.patch(
+            f"{self.url}{self.friendship.id}/",
+            {"action": "accept"},
+            headers=self.headers,
+        )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(
-            response.data["detail"], "You do not have permission to perform this action."
+            response.data["detail"],
+            "You do not have permission to perform this action.",
         )
 
-    def test_invalid_action(self):
-        login_credentials = {"username_or_email": "anotheruser", "password": "Swift-1234"}
+    def test_accept_reject_friendships_with_unauthorized_user(self):
+        Users.objects.create_user(
+            username="unauthorizeduser",
+            email="unauthorizeduser@example.com",
+            first_name="Unauthorized",
+            last_name="User",
+            birthdate="1990-01-01",
+            password="Swift-1234",
+        )
+
+        login_credentials = {
+            "username_or_email": "unauthorizeduser",
+            "password": "Swift-1234",
+        }
         login = self.client.post("/api/login/", login_credentials)
         headers = {"Authorization": f"Bearer {login.data.get('access')}"}
 
-        response = self.client.patch(f"{self.url}{self.friendship.id}/", {"action": "invalid"}, headers=headers)
+        actions = ["accept", "reject"]
+
+        for action in actions:
+            with self.subTest():
+                response = self.client.patch(
+                    f"{self.url}{self.friendship.id}/",
+                    {"action": action},
+                    headers=headers,
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+                self.assertEqual(
+                    response.data["detail"],
+                    "You do not have permission to perform this action.",
+                )
+
+    def test_invalid_action(self):
+        login_credentials = {
+            "username_or_email": "anotheruser",
+            "password": "Swift-1234",
+        }
+        login = self.client.post("/api/login/", login_credentials)
+        headers = {"Authorization": f"Bearer {login.data.get('access')}"}
+
+        response = self.client.patch(
+            f"{self.url}{self.friendship.id}/", {"action": "invalid"}, headers=headers
+        )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["detail"], "Invalid action")
 
     def test_accept_friendships(self):
-        login_credentials = {"username_or_email": "anotheruser", "password": "Swift-1234"}
+        login_credentials = {
+            "username_or_email": "anotheruser",
+            "password": "Swift-1234",
+        }
         login = self.client.post("/api/login/", login_credentials)
         headers = {"Authorization": f"Bearer {login.data.get('access')}"}
 
-        response = self.client.patch(f"{self.url}{self.friendship.id}/", {"action": "accept"}, headers=headers)
+        response = self.client.patch(
+            f"{self.url}{self.friendship.id}/", {"action": "accept"}, headers=headers
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["detail"], "Friendship accepted")
-        self.assertEqual(Friendships.objects.get(id=self.friendship.id).status, Friendships.ACCEPTED)
+        self.assertEqual(
+            Friendships.objects.get(id=self.friendship.id).status, Friendships.ACCEPTED
+        )
 
     def test_reject_friendships(self):
-        login_credentials = {"username_or_email": "anotheruser", "password": "Swift-1234"}
+        login_credentials = {
+            "username_or_email": "anotheruser",
+            "password": "Swift-1234",
+        }
         login = self.client.post("/api/login/", login_credentials)
         headers = {"Authorization": f"Bearer {login.data.get('access')}"}
 
-        response = self.client.patch(f"{self.url}{self.friendship.id}/", {"action": "reject"}, headers=headers)
+        response = self.client.patch(
+            f"{self.url}{self.friendship.id}/", {"action": "reject"}, headers=headers
+        )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["detail"], "Friendship rejected")
-        self.assertEqual(Friendships.objects.get(id=self.friendship.id).status, Friendships.REJECTED)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        with self.assertRaises(Friendships.DoesNotExist):
+            Friendships.objects.get(id=self.friendship.id)
 
     def test_accept_friendships_with_not_existing_friendships(self):
-        login_credentials = {"username_or_email": "anotheruser", "password": "Swift-1234"}
+        login_credentials = {
+            "username_or_email": "anotheruser",
+            "password": "Swift-1234",
+        }
         login = self.client.post("/api/login/", login_credentials)
         headers = {"Authorization": f"Bearer {login.data.get('access')}"}
 
-        response = self.client.patch(f"{self.url}100000/", {"action": "accept"}, headers=headers)
+        response = self.client.patch(
+            f"{self.url}100000/", {"action": "accept"}, headers=headers
+        )
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.data["detail"], "No Friendships matches the given query.")
+        self.assertEqual(
+            response.data["detail"], "No Friendships matches the given query."
+        )
 
     def test_accept_friendships_with_not_pending_friendships(self):
-        login_credentials = {"username_or_email": "anotheruser", "password": "Swift-1234"}
+        login_credentials = {
+            "username_or_email": "anotheruser",
+            "password": "Swift-1234",
+        }
         login = self.client.post("/api/login/", login_credentials)
         headers = {"Authorization": f"Bearer {login.data.get('access')}"}
 
         self.friendship.status = Friendships.ACCEPTED
         self.friendship.save()
 
-        response = self.client.patch(f"{self.url}{self.friendship.id}/", {"action": "accept"}, headers=headers)
+        response = self.client.patch(
+            f"{self.url}{self.friendship.id}/", {"action": "accept"}, headers=headers
+        )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data["detail"], "You cannot perform this action on this friendship.")
+        self.assertEqual(
+            response.data["detail"],
+            "You cannot perform this action on this friendship.",
+        )
+
+
+class DeleteFriendshipsViewTests(TestCase):
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+        self.url = "/api/friendships/"
+
+        self.user = Users.objects.create_user(
+            username="testuser",
+            email="testuser@example.com",
+            first_name="Test",
+            last_name="User",
+            birthdate="1990-01-01",
+            password="Swift-1234",
+        )
+
+        another_user = Users.objects.create_user(
+            username="anotheruser",
+            email="anotheruser@example.com",
+            first_name="Another",
+            last_name="User",
+            birthdate="1990-01-01",
+            password="Swift-1234",
+        )
+
+        # Create a friendship
+        self.friendship = Friendships.objects.create(
+            user1=self.user, user2=another_user
+        )
+
+        login_credentials = {"username_or_email": "testuser", "password": "Swift-1234"}
+        login = self.client.post("/api/login/", login_credentials)
+        self.headers = {"Authorization": f"Bearer {login.data.get('access')}"}
+
+    def test_view_for_unauthenticated_users(self):
+        response = self.client.delete(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_delete_friendships_with_not_existing_friendships(self):
+        response = self.client.delete(f"{self.url}100000/", headers=self.headers)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(
+            response.data["detail"], "No Friendships matches the given query."
+        )
+
+    def test_delete_friendships_with_unauthorized_user(self):
+        Users.objects.create_user(
+            username="unauthorizeduser",
+            email="unauthorizeduser@example.com",
+            first_name="Unauthorized",
+            last_name="User",
+            birthdate="1990-01-01",
+            password="Swift-1234",
+        )
+
+        login_credentials = {
+            "username_or_email": "unauthorizeduser",
+            "password": "Swift-1234",
+        }
+        login = self.client.post("/api/login/", login_credentials)
+        headers = {"Authorization": f"Bearer {login.data.get('access')}"}
+
+        response = self.client.delete(
+            f"{self.url}{self.friendship.id}/", headers=headers
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(
+            response.data["detail"],
+            "You do not have permission to perform this action.",
+        )
+
+    def test_cancel_pending_with_already_accepted_friendship(self):
+        self.friendship.status = Friendships.ACCEPTED
+        self.friendship.save()
+
+        response = self.client.delete(
+            f"{self.url}{self.friendship.id}/",
+            {"action": "cancel_pending"},
+            headers=self.headers,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["detail"], "The friendship has already been accepted."
+        )
+
+    def test_cancel_pending_friendship(self):
+        response = self.client.delete(
+            f"{self.url}{self.friendship.id}/",
+            {"action": "cancel_pending"},
+            headers=self.headers,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        with self.assertRaises(Friendships.DoesNotExist):
+            Friendships.objects.get(id=self.friendship.id)
+
+    def test_delete_friendship(self):
+        response = self.client.delete(
+            f"{self.url}{self.friendship.id}/", headers=self.headers
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        with self.assertRaises(Friendships.DoesNotExist):
+            Friendships.objects.get(id=self.friendship.id)
