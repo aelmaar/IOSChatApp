@@ -1,4 +1,3 @@
-from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -7,32 +6,29 @@ from django.shortcuts import get_object_or_404
 from .models import Friendships
 from django.db.models import Q
 from django.http import Http404
+from rest_framework.permissions import IsAuthenticated
+from .permissions import IsFriendshipParticipant
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 class FriendshipsView(APIView):
+    permission_classes = [IsAuthenticated, IsFriendshipParticipant]
+
     def get(self, request, pk=None):
-        try:
-            if pk:
-                friendship = get_object_or_404(Friendships, pk=pk)
-                serializer = FriendshipsSerializer(
-                    friendship, context={"request": request}
-                )
-                return Response(serializer.data)
-            friendships = Friendships.objects.filter(
-                Q(user1=request.user) | Q(user2=request.user)
-            )
-            serializer = FriendshipsSerializer(
-                friendships, context={"request": request}, many=True
-            )
+        if pk:
+            friendship = get_object_or_404(Friendships, pk=pk)
+            self.check_object_permissions(request, friendship)
+            serializer = FriendshipsSerializer(friendship, context={"request": request})
             return Response(serializer.data)
-        except Http404:
-            return Response(
-                {"detail": "No Friendships matches the given query."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        friendships = Friendships.objects.filter(
+            Q(user1=request.user) | Q(user2=request.user)
+        )
+        serializer = FriendshipsSerializer(
+            friendships, context={"request": request}, many=True
+        )
+        return Response(serializer.data)
 
     def post(self, request):
         serializer = FriendshipsSerializer(
@@ -47,6 +43,7 @@ class FriendshipsView(APIView):
     def patch(self, request, pk=None):
         user = request.user
         friendship = get_object_or_404(Friendships, pk=pk)
+        self.check_object_permissions(request, friendship)
 
         if friendship.user1 == user:
             return Response(
@@ -65,9 +62,26 @@ class FriendshipsView(APIView):
             friendship.save()
             return Response({"detail": "Friendship accepted"})
         elif action == "reject":
-            friendship.status = Friendships.REJECTED
-            friendship.save()
-            return Response({"detail": "Friendship rejected"})
+            friendship.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
         return Response(
             {"detail": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST
         )
+
+    def delete(self, request, pk=None):
+        friendship = get_object_or_404(Friendships, pk=pk)
+        self.check_object_permissions(request, friendship)
+
+        action = request.data.get("action")
+
+        if action == "cancel_pending":
+            if friendship.status == Friendships.PENDING:
+                friendship.delete()
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            return Response(
+                {"detail": "The friendship has already been accepted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        friendship.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

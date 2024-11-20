@@ -10,12 +10,10 @@ from django.core.exceptions import ValidationError
 class Friendships(models.Model):
     PENDING = "PENDING"
     ACCEPTED = "ACCEPTED"
-    REJECTED = "REJECTED"
 
     STATUS_CHOICES = {
         (PENDING, "Pending"),
         (ACCEPTED, "Accepted"),
-        (REJECTED, "Rejected"),
     }
 
     user1 = models.ForeignKey(
