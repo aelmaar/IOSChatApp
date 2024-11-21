@@ -9,6 +9,7 @@ from .serializers import (
     UpdateProfileSerializer,
     UpdatePasswordSerializer,
     UpdatePictureSerializer,
+    BlacklistSerializer,
 )
 from .models import Users
 from chat_app.permissions import IsUnauthenticated
@@ -16,7 +17,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
 from django.conf import settings
 from rest_framework.serializers import ValidationError
-from users.models import Users
+from users.models import Users, Blacklist
 from django.utils.crypto import get_random_string
 from django.core.files.storage import default_storage
 import requests
@@ -48,6 +49,7 @@ class LoginView(APIView):
             If valid, generates and returns JWT tokens (access and refresh).
             If invalid, returns validation errors.
     """
+
     serializer_class = LoginSerializer
     permission_classes = [IsUnauthenticated]
 
@@ -80,16 +82,17 @@ class OAuthGoogleCallbackView(APIView):
     -------
     post(request):
         Handles the POST request to process the authorization code and log the user in.
-    
+
     get_or_create_user(userinfo):
         Retrieves or creates a user based on the user information from the OAuth Google provider.
-    
+
     exchange_code_with_access_token(authorization_code):
         Exchanges the authorization code for an access token.
-    
+
     request_42_userinfo(access_token):
         Retrieves user information from the OAuth Google provider using the access token.
     """
+
     permission_classes = [IsUnauthenticated]
 
     def post(self, request):
@@ -192,16 +195,17 @@ class OAuth42CallbackView(APIView):
     -------
     post(request):
         Handles the POST request to process the authorization code and log the user in.
-    
+
     get_or_create_user(userinfo):
         Retrieves or creates a user based on the user information from the OAuth 42 provider.
-    
+
     exchange_code_with_access_token(authorization_code):
         Exchanges the authorization code for an access token.
-    
+
     request_42_userinfo(access_token):
         Retrieves user information from the OAuth 42 provider using the access token.
     """
+
     permission_classes = [IsUnauthenticated]
 
     def post(self, request):
@@ -346,3 +350,35 @@ class DeletePictureView(APIView):
             user.picture = None
             user.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class BlacklistView(APIView):
+
+    def get(self, request):
+        blocked_users = Blacklist.objects.filter(user=request.user)
+        serializer = BlacklistSerializer(
+            blocked_users, many=True, context={"request", request}
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        serializer = BlacklistSerializer(
+            data=request.data, context={"request": request}
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request):
+        blocked_username = request.data.get("blocked_username")
+
+        blocked_user = Blacklist.objects.filter(
+            user=request.user,
+            blocked_user=Users.objects.filter(username=blocked_username).first(),
+        ).first()
+
+        if blocked_user:
+            blocked_user.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(status=status.HTTP_404_NOT_FOUND)
