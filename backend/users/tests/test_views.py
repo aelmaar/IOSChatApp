@@ -1,12 +1,13 @@
 from django.test import TestCase
 from rest_framework.test import APIClient
 from rest_framework import status
-from users.models import Users
+from users.models import Users, Blacklist
 from unittest.mock import patch
 from django.urls import reverse
 from .test_helpers import create_test_image, delete_test_images
 from io import BytesIO
 from django.core.files.uploadedfile import SimpleUploadedFile
+from users.serializers import UsersSerializer
 import os
 
 
@@ -24,6 +25,7 @@ class RegisterViewTests(TestCase):
     - `setUp`: Initializes common test data and creates a user in the database to test for unique constraints.
     - `tearDown`: Cleans up any test images created during the tests.
     """
+
     def setUp(self):
         self.client = APIClient()
         self.url = "/api/register/"
@@ -130,7 +132,6 @@ class RegisterViewTests(TestCase):
 
         response = self.client.post(self.url, self.user_data)
 
-
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertIn("picture", response.data)
         self.assertTrue(response.data["picture"].startswith("http"))
@@ -165,11 +166,11 @@ class RegisterViewTests(TestCase):
 
                 response = self.client.post(self.url, user_data_copy)
 
-
                 self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
                 self.assertEqual(response.data["picture"][0], error)
 
                 self.test_images.append(value.name)
+
 
 class LoginViewTests(TestCase):
     """
@@ -183,6 +184,7 @@ class LoginViewTests(TestCase):
     Methods:
     - `setUp`: Sets up a test user and credentials for the tests.
     """
+
     def setUp(self):
         self.client = APIClient()
         self.url = "/api/login/"
@@ -243,6 +245,7 @@ class OAuthCallbackViewTests(TestCase):
     - `setUp`: Sets up the initial data for the tests.
     - `post_and_assert`: Helper method to post data to the callback URL and assert the response.
     """
+
     def setUp(self):
 
         self.client = APIClient()
@@ -336,6 +339,7 @@ class UpdateProfileViewTests(TestCase):
     Methods:
     - `setUp`: Sets up the initial user data and authentication for the tests.
     """
+
     def setUp(self) -> None:
         self.url = "/api/update-profile/"
         self.client = APIClient()
@@ -469,6 +473,7 @@ class UpdatePasswordViewTests(TestCase):
     Methods:
     - `setUp`: Sets up the initial data for the tests, including creating a user and mock request.
     """
+
     def setUp(self) -> None:
         self.client = APIClient()
         self.url = "/api/update-password/"
@@ -546,6 +551,7 @@ class UpdatePictureViewTests(TestCase):
     - `setUp`: Sets up the test environment by creating a test user and initializing test data.
     - `tearDown`: Cleans up the test environment by deleting test images after each test.
     """
+
     def setUp(self) -> None:
         self.client = APIClient()
         self.url = "/api/update-picture/"
@@ -574,7 +580,6 @@ class UpdatePictureViewTests(TestCase):
         new_picture = create_test_image(1)
 
         response = self.client.patch(self.url, {"new_picture": new_picture})
-
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertIn("detail", response.data)
@@ -632,13 +637,14 @@ class DeletePictureViewTests(TestCase):
     Test suite for the DeletePictureView.
 
     Test cases:
-    - `test_view_for_unauthorized_users`: Tests that the view is not accessible by unauthorized users.
+    - `test_view_for_unauthenticated_users`: Tests that the view is not accessible by unauthenticated users.
     - `test_view_with_no_picture_to_delete`: Tests the view when there is no picture to delete.
     - `test_view_with_picture_to_delete`: Tests the view when there is a picture to delete.
 
     Methods:
     - `setUp`: Sets up the test environment by creating a test user and initializing test data.
     """
+
     def setUp(self) -> None:
         self.client = APIClient()
         self.url = "/api/delete-picture/"
@@ -655,18 +661,18 @@ class DeletePictureViewTests(TestCase):
             "/api/login/", {"username_or_email": "testuser", "password": "Swift-1234"}
         )
         self.headers = {"Authorization": f"Bearer {self.login.data.get('access')}"}
-    
-    def test_view_for_unauthorized_users(self):
+
+    def test_view_for_unauthenticated_users(self):
         response = self.client.delete(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertIn("detail", response.data)
-    
+
     def test_view_with_no_picture_to_delete(self):
         response = self.client.delete(self.url, headers=self.headers)
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-    
+
     def test_view_with_picture_to_delete(self):
         self.user.picture = create_test_image(1)
         self.user.save()
@@ -674,4 +680,182 @@ class DeletePictureViewTests(TestCase):
         response = self.client.delete(self.url, headers=self.headers)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.user.refresh_from_db()
-        self.assertEqual(self.user.picture.name, '')
+        self.assertEqual(self.user.picture.name, "")
+
+
+class BlacklistViewTests(TestCase):
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+        self.url = "/api/blacklist/"
+
+        self.user = Users.objects.create_user(
+            username="testuser",
+            email="testuser@example.com",
+            first_name="Test",
+            last_name="User",
+            birthdate="1990-01-01",
+            password="Swift-1234",
+        )
+
+        second_user = Users.objects.create_user(
+            username="seconduser",
+            email="seconduser@example.com",
+            first_name="Second",
+            last_name="User",
+            birthdate="1990-01-01",
+            password="Swift-1234",
+        )
+
+        third_user = Users.objects.create_user(
+            username="thirduser",
+            email="thirduser@example.com",
+            first_name="Third",
+            last_name="User",
+            birthdate="1990-01-01",
+            password="Swift-1234",
+        )
+
+        Blacklist.objects.create(user=self.user, blocked_user=second_user)
+        Blacklist.objects.create(user=self.user, blocked_user=third_user)
+
+        login_credentials = {"username_or_email": "testuser", "password": "Swift-1234"}
+        login = self.client.post("/api/login/", login_credentials)
+        self.headers = {"Authorization": f"Bearer {login.data.get('access')}"}
+
+    def test_view_for_unauthenticated_users(self):
+        response = self.client.post(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_blocked_username_with_invalid_data(self):
+        test_cases = [
+            ("", "This field may not be blank."),
+            (
+                "anouarelmaaroufiejfdjkjldioafiejfajkdvnakjsdvijefij",
+                "Ensure this field has no more than 30 characters.",
+            ),
+        ]
+
+        for value, error in test_cases:
+            with self.subTest():
+                response = self.client.post(
+                    self.url, {"blocked_username": value}, headers=self.headers
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertEqual(response.data["blocked_username"][0], error)
+
+    def test_cannot_block_or_unblock_oneself(self):
+        response = self.client.post(
+            self.url, {"blocked_username": self.user.username}, headers=self.headers
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["blocked_username"][0],
+            "You cannot block or unblock yourself.",
+        )
+
+    def test_with_not_existing_blocked_username(self):
+        response = self.client.post(
+            self.url, {"blocked_username": "notexistinguser"}, headers=self.headers
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data["detail"], "No Users matches the given query.")
+
+    def test_with_an_already_blocked_user(self):
+        blocked_user = Users.objects.create_user(
+            username="blockeduser",
+            email="blockeduser@example.com",
+            first_name="Blocked",
+            last_name="User",
+            birthdate="1990-01-01",
+            password="Swift-1234",
+        )
+
+        Blacklist.objects.create(user=self.user, blocked_user=blocked_user)
+
+        response = self.client.post(
+            self.url, {"blocked_username": blocked_user.username}, headers=self.headers
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["non_field_errors"][0], "User is already blocked."
+        )
+
+    def test_blocking_a_user(self):
+        blocked_user = Users.objects.create_user(
+            username="blockeduser",
+            email="blockeduser@example.com",
+            first_name="Blocked",
+            last_name="User",
+            birthdate="1990-01-01",
+            password="Swift-1234",
+        )
+
+        response = self.client.post(
+            self.url, {"blocked_username": blocked_user.username}, headers=self.headers
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            response.data["blocked_user"], UsersSerializer(blocked_user).data
+        )
+
+    def test_listing_not_existing_blocked_users(self):
+        Users.objects.create_user(
+            username="anotheruser",
+            email="anotheruser@example.com",
+            first_name="Another",
+            last_name="User",
+            birthdate="1990-01-01",
+            password="Swift-1234",
+        )
+
+        login_credentials = {
+            "username_or_email": "anotheruser",
+            "password": "Swift-1234",
+        }
+        login = self.client.post("/api/login/", login_credentials)
+        headers = {"Authorization": f"Bearer {login.data.get('access')}"}
+
+        response = self.client.get(self.url, headers=headers)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(len(response.data) == 0)
+
+    def test_listing_blocked_users(self):
+
+        response = self.client.get(self.url, headers=self.headers)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(len(response.data) == 2)
+        self.assertEqual(response.data[0]["blocked_user"].get("username"), "seconduser")
+        self.assertEqual(response.data[1]["blocked_user"].get("username"), "thirduser")
+
+    def test_unblock_none_blocked_user(self):
+        response = self.client.delete(self.url, headers=self.headers)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_unblock_not_existing_blocked_user(self):
+        response = self.client.delete(
+            self.url, {"blocked_username": "notexistinguser"}, headers=self.headers
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_unblock_a_blocked_user(self):
+        response = self.client.delete(
+            self.url, {"blocked_username": "seconduser"}, headers=self.headers
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        blocked_user = Users.objects.get(username="seconduser")
+
+        with self.assertRaises(Blacklist.DoesNotExist):
+            Blacklist.objects.get(user=self.user, blocked_user=blocked_user)
