@@ -103,10 +103,6 @@ class ListRetrieveFriendshipsViewTests(FriendshipsTestsBase):
 
     def test_retrieve_friendship_with_unauthorized_user(self):
 
-        # create_test_user(
-        #     username="unauthorizeduser", email="unauthorizeduser@example.com"
-        # )
-
         headers = self.get_headers_for_unauthorized_user()
 
         response = self.client.get(f"{self.url}{self.friendship.id}/", headers=headers)
