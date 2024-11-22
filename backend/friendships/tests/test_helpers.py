@@ -1,6 +1,7 @@
 from chat_app.helpers import create_test_user, get_auth_headers
 from django.test import TestCase
 from rest_framework.test import APIClient
+from friendships.models import Friendships
 
 class FriendshipsTestsBase(TestCase):
 

@@ -1,9 +1,8 @@
 from django.contrib.auth import get_user_model
 from rest_framework import status
-from friendships.models import Friendships
 from chat_app.helpers import create_test_user, get_auth_headers
 from users.serializers import UsersSerializer
-from .test_helpers import FriendshipsTestsBase
+from .test_helpers import FriendshipsTestsBase, Friendships
 
 Users = get_user_model()
 
