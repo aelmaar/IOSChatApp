@@ -15,6 +15,7 @@ from io import BytesIO
 from django.core.files.uploadedfile import SimpleUploadedFile
 from unittest.mock import Mock
 from django.http import Http404
+from chat_app.helpers import create_test_user
 
 
 class RegisterSerializerTests(TestCase):
@@ -43,14 +44,7 @@ class RegisterSerializerTests(TestCase):
             "confirm_password": "Swift-1234",
         }
 
-        Users.objects.create_user(
-            username="differentuser",
-            email="differentuser@example.com",
-            first_name="differentuser",
-            last_name="differentuser",
-            birthdate="1990-01-01",
-            password="Swift-1234",
-        )
+        create_test_user(username="differentuser", email="differentuser@example.com")
 
         self.test_images = []
 
@@ -191,14 +185,7 @@ class LoginSerializerTests(TestCase):
     """
 
     def setUp(self):
-        Users.objects.create_user(
-            username="testuser",
-            email="testuser@example.com",
-            first_name="testuser",
-            last_name="testuser",
-            birthdate="1990-01-01",
-            password="Swift-1234",
-        )
+        create_test_user(username="testuser", email="testuser@example.com")
 
         self.credentials = {"username_or_email": "testuser", "password": "Swift-1234"}
 
@@ -359,13 +346,7 @@ class UpdatePasswordSerializerTests(TestCase):
             "confirm_password": "Swift-1234",
         }
 
-        self.user = Users.objects.create_user(
-            username="testuser",
-            email="testuser@gmail.com",
-            first_name="Test",
-            last_name="User",
-            password="Swift-1234",
-        )
+        self.user = create_test_user(username="testuser", email="testuser@example.com")
 
         self.mock_request = Mock()
         self.mock_request.user = self.user
@@ -422,14 +403,7 @@ class UpdatePictureSerializerTests(TestCase):
 
     def setUp(self) -> None:
         picture = create_test_image(1)
-        self.user = Users.objects.create_user(
-            username="testuser",
-            email="testuser@gmail.com",
-            first_name="Test",
-            last_name="User",
-            picture=picture,
-            password="Swift-1234",
-        )
+        self.user = create_test_user(username="testuser", email="testuser@example.com")
 
         self.mock_request = Mock()
         self.mock_request.user = self.user
@@ -495,14 +469,10 @@ class UsersSerializerTests(TestCase):
 
     def test_display_user_info(self):
         picture = create_test_image(1)
-        user = Users.objects.create_user(
-            username="testuser",
-            email="testuser@gmail.com",
-            first_name="Test",
-            last_name="User",
-            picture=picture,
-            password="Swift-1234",
-        )
+        user = create_test_user(username="testuser", email="testuser@example.com")
+
+        user.picture = picture
+        user.save()
 
         serializer = UsersSerializer(user)
         self.assertEqual(serializer.data["username"], user.username)
@@ -515,14 +485,7 @@ class UsersSerializerTests(TestCase):
 class BlacklistSerializerTests(TestCase):
 
     def setUp(self) -> None:
-        self.user = Users.objects.create_user(
-            username="testuser",
-            email="testuser@example.com",
-            first_name="Test",
-            last_name="User",
-            birthdate="1990-01-01",
-            password="Swift-1234",
-        )
+        self.user = create_test_user(username="testuser", email="testuser@example.com")
 
         self.mock_request = Mock()
         self.mock_request.user = self.user
@@ -554,7 +517,7 @@ class BlacklistSerializerTests(TestCase):
             "You cannot block or unblock yourself.",
         )
 
-    def test_with_not_existing_blocked_username(self):
+    def test_with_nonexisting_blocked_username(self):
         with self.assertRaises(Http404):
             serializer = BlacklistSerializer(
                 data={"blocked_username": "notexistinguser"},
@@ -564,13 +527,10 @@ class BlacklistSerializerTests(TestCase):
             self.assertFalse(serializer.is_valid(), msg=serializer.errors)
 
     def test_blocking_an_already_blocked_user(self):
-        blocked_user = Users.objects.create_user(
+        blocked_user = create_test_user(
             username="blockeduser",
             email="blockeduser@example.com",
             first_name="Blocked",
-            last_name="User",
-            birthdate="1990-01-01",
-            password="Swift-1234",
         )
 
         Blacklist.objects.create(user=self.user, blocked_user=blocked_user)
@@ -587,13 +547,10 @@ class BlacklistSerializerTests(TestCase):
         )
 
     def test_blocking_a_user(self):
-        blocked_user = Users.objects.create_user(
+        blocked_user = create_test_user(
             username="blockeduser",
             email="blockeduser@example.com",
             first_name="Blocked",
-            last_name="User",
-            birthdate="1990-01-01",
-            password="Swift-1234",
         )
 
         serializer = BlacklistSerializer(

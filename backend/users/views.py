@@ -302,7 +302,16 @@ class OAuth42CallbackView(APIView):
 
 
 class UpdateProfileView(APIView):
+    """
+    UpdateProfileView handles user profile update requests.
 
+    Methods:
+        patch(request, *args, **kwargs):
+            Handles PATCH requests to update the user profile.
+            Validates the provided data using the serializer.
+            If valid, updates the user profile and returns the updated data.
+            If invalid, returns validation errors.
+    """
     def patch(self, request, *args, **kwargs):
         serializer = UpdateProfileSerializer(
             data=request.data, context={"request": request}
@@ -315,7 +324,16 @@ class UpdateProfileView(APIView):
 
 
 class UpdatePasswordView(APIView):
+    """
+    UpdatePasswordView handles user password update requests.
 
+    Methods:
+        patch(request, *args, **kwargs):
+            Handles PATCH requests to update the user password.
+            Validates the provided data using the serializer.
+            If valid, updates the user password and returns a success message.
+            If invalid, returns validation errors.
+    """
     def patch(self, request, *args, **kwargs):
         serializer = UpdatePasswordSerializer(
             data=request.data, context={"request": request}
@@ -330,7 +348,16 @@ class UpdatePasswordView(APIView):
 
 
 class UpdatePictureView(APIView):
+    """
+    UpdatePictureView handles user profile picture update requests.
 
+    Methods:
+        patch(request, *args, **kwargs):
+            Handles PATCH requests to update the user profile picture.
+            Validates the provided data using the serializer.
+            If valid, updates the user profile picture and returns the updated data.
+            If invalid, returns validation errors.
+    """
     def patch(self, request, *args, **kwargs):
         serializer = UpdatePictureSerializer(
             data=request.data, context={"request": request}
@@ -342,7 +369,15 @@ class UpdatePictureView(APIView):
 
 
 class DeletePictureView(APIView):
+    """
+    DeletePictureView handles user profile picture deletion requests.
 
+    Methods:
+        delete(request, *args, **kwargs):
+            Handles DELETE requests to delete the user profile picture.
+            If the user has a profile picture, deletes the picture and returns a success message.
+            If the user does not have a profile picture, returns a success message.
+    """
     def delete(self, request, *args, **kwargs):
         user = request.user
         if user.picture and default_storage.exists(user.picture.path):
@@ -353,7 +388,23 @@ class DeletePictureView(APIView):
 
 
 class BlacklistView(APIView):
+    """
+    BlacklistView handles user blacklist requests.
 
+    Methods:
+        get(request):
+            Handles GET requests to retrieve the list of blocked users.
+            Returns the list of blocked users.
+        post(request):
+            Handles POST requests to block a user.
+            Validates the provided data using the serializer.
+            If valid, blocks the user and returns the blocked user data.
+            If invalid, returns validation errors.
+        delete(request):
+            Handles DELETE requests to unblock a user.
+            If the user is blocked, unblocks the user and returns a success message.
+            If the user is not blocked, returns a 404 not found error.
+    """
     def get(self, request):
         blocked_users = Blacklist.objects.filter(user=request.user)
         serializer = BlacklistSerializer(

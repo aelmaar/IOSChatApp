@@ -4,28 +4,42 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 from django.http import Http404
 from friendships.models import Friendships
+from chat_app.helpers import create_test_user, get_auth_headers
+from users.serializers import UsersSerializer
 
 Users = get_user_model()
 
 
-class CreateFriendshipsViewTests(TestCase):
+class FriendshipsTestsBase(TestCase):
 
     def setUp(self) -> None:
         self.client = APIClient()
+        self.user = create_test_user(username="testuser", email="testuser@example.com")
         self.url = "/api/friendships/"
+        self.another_user = create_test_user(
+            username="anotheruser", email="anotheruser@example.com"
+        )
+        self.headers = get_auth_headers(self.client, "testuser", "Swift-1234")
 
-        self.user = Users.objects.create_user(
-            username="testuser",
-            email="testuser@example.com",
-            first_name="Test",
-            last_name="User",
-            birthdate="1990-01-01",
-            password="Swift-1234",
+    def create_friendship(self, user1=None, user2=None):
+        user1 = user1 or self.user
+        user2 = user2 or self.another_user
+        return Friendships.objects.create(user1=user1, user2=user2)
+
+    def get_headers_for_unauthorized_user(self):
+        create_test_user(
+            username="unauthorizeduser", email="unauthorizeduser@example.com"
         )
 
-        login_credentials = {"username_or_email": "testuser", "password": "Swift-1234"}
-        login = self.client.post("/api/login/", login_credentials)
-        self.headers = {"Authorization": f"Bearer {login.data.get('access')}"}
+        headers = get_auth_headers(self.client, "unauthorizeduser", "Swift-1234")
+
+        return headers
+
+
+class CreateFriendshipsViewTests(FriendshipsTestsBase):
+
+    def setUp(self) -> None:
+        super().setUp()
 
     def test_view_for_unauthenticated_users(self):
         response = self.client.post(self.url, {"friend_username": "something"})
@@ -60,7 +74,7 @@ class CreateFriendshipsViewTests(TestCase):
             response.data["friend_username"][0], "You cannot be friends with yourself."
         )
 
-    def test_with_not_existing_friend_username(self):
+    def test_with_nonexisting_friend_username(self):
         response = self.client.post(
             self.url, {"friend_username": "notexistinguser"}, headers=self.headers
         )
@@ -69,21 +83,15 @@ class CreateFriendshipsViewTests(TestCase):
         self.assertEqual(response.data["detail"], "No Users matches the given query.")
 
     def test_with_existing_friend_username(self):
-        another_user = Users.objects.create_user(
-            username="anotheruser",
-            email="anotheruser@example.com",
-            first_name="Another",
-            last_name="User",
-            birthdate="1990-01-01",
-            password="Swift-1234",
-        )
 
         # Create a friendship
-        Friendships.objects.create(user1=self.user, user2=another_user)
+        self.create_friendship()
 
         # Create another friendship to test against an existing friendship
         response = self.client.post(
-            self.url, {"friend_username": another_user.username}, headers=self.headers
+            self.url,
+            {"friend_username": self.another_user.username},
+            headers=self.headers,
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -92,98 +100,43 @@ class CreateFriendshipsViewTests(TestCase):
         )
 
     def test_successful_friendships_creation(self):
-        another_user = Users.objects.create_user(
-            username="anotheruser",
-            email="anotheruser@example.com",
-            first_name="Another",
-            last_name="User",
-            birthdate="1990-01-01",
-            password="Swift-1234",
-        )
 
         response = self.client.post(
-            self.url, {"friend_username": another_user.username}, headers=self.headers
+            self.url,
+            {"friend_username": self.another_user.username},
+            headers=self.headers,
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
             response.data["friend"],
-            {
-                "username": another_user.username,
-                "first_name": another_user.first_name,
-                "last_name": another_user.last_name,
-                "birthdate": another_user.birthdate,
-                "picture": None,
-            },
+            UsersSerializer(self.another_user).data,
         )
 
         self.assertEqual(response.data["status"], Friendships.PENDING)
         self.assertEqual(response.data["pending_action"], "waiting_for_response")
 
 
-class ListRetrieveFriendshipsViewTests(TestCase):
+class ListRetrieveFriendshipsViewTests(FriendshipsTestsBase):
 
     def setUp(self) -> None:
-        self.client = APIClient()
-        self.url = "/api/friendships/"
-
-        self.user = Users.objects.create_user(
-            username="testuser",
-            email="testuser@example.com",
-            first_name="Test",
-            last_name="User",
-            birthdate="1990-01-01",
-            password="Swift-1234",
-        )
-
-        # Create three users to test the friendships
-        second_user = Users.objects.create_user(
-            username="seconduser",
-            email="seconduser@example.com",
-            first_name="Second",
-            last_name="User",
-            birthdate="1990-01-01",
-            password="Swift-1234",
-        )
-
-        third_user = Users.objects.create_user(
-            username="thirduser",
-            email="thirduser@example.com",
-            first_name="Third",
-            last_name="User",
-            birthdate="1990-01-01",
-            password="Swift-1234",
-        )
+        super().setUp()
 
         # Create friendships
-        self.friendship = Friendships.objects.create(user1=self.user, user2=second_user)
-        Friendships.objects.create(user1=third_user, user2=self.user)
-
-        login_credentials = {"username_or_email": "testuser", "password": "Swift-1234"}
-        login = self.client.post("/api/login/", login_credentials)
-        self.headers = {"Authorization": f"Bearer {login.data.get('access')}"}
+        self.friendship = self.create_friendship()
 
     def test_view_for_unauthenticated_users(self):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_retrieving_friendship_with_unauthorized_user(self):
-        Users.objects.create_user(
-            username="unauthorizeduser",
-            email="unauthorizeduser@example.com",
-            first_name="Unauthorized",
-            last_name="User",
-            birthdate="1990-01-01",
-            password="Swift-1234",
-        )
+    def test_retrieve_friendship_with_unauthorized_user(self):
 
-        login_credentials = {
-            "username_or_email": "unauthorizeduser",
-            "password": "Swift-1234",
-        }
-        login = self.client.post("/api/login/", login_credentials)
-        headers = {"Authorization": f"Bearer {login.data.get('access')}"}
+        # create_test_user(
+        #     username="unauthorizeduser", email="unauthorizeduser@example.com"
+        # )
+
+        headers = self.get_headers_for_unauthorized_user()
 
         response = self.client.get(f"{self.url}{self.friendship.id}/", headers=headers)
 
@@ -193,7 +146,7 @@ class ListRetrieveFriendshipsViewTests(TestCase):
             "You do not have permission to perform this action.",
         )
 
-    def test_retrieving_not_existing_friendships(self):
+    def test_retrieve_nonexisting_friendships(self):
         response = self.client.get(f"{self.url}100000/", headers=self.headers)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
@@ -209,70 +162,47 @@ class ListRetrieveFriendshipsViewTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
             response.data["friend"],
-            {
-                "username": self.friendship.user2.username,
-                "first_name": self.friendship.user2.first_name,
-                "last_name": self.friendship.user2.last_name,
-                "birthdate": self.friendship.user2.birthdate,
-                "picture": None,
-            },
+            UsersSerializer(self.friendship.user2).data,
         )
 
         self.assertEqual(response.data["status"], self.friendship.status)
         self.assertEqual(response.data["pending_action"], "waiting_for_response")
 
     def test_list_friendships(self):
+        # Create another friendship
+        third_user = create_test_user(
+            username="thirduser", email="thirduser@example.com"
+        )
+
+        self.create_friendship(user1=third_user, user2=self.user)
         response = self.client.get(self.url, headers=self.headers)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 2)
         self.assertEqual(
             response.data[0]["friend"],
-            {
-                "username": self.friendship.user2.username,
-                "first_name": self.friendship.user2.first_name,
-                "last_name": self.friendship.user2.last_name,
-                "birthdate": self.friendship.user2.birthdate,
-                "picture": None,
-            },
+            UsersSerializer(self.friendship.user2).data,
+        )
+
+        self.assertEqual(
+            response.data[1]["friend"],
+            UsersSerializer(third_user).data,
         )
 
         self.assertEqual(response.data[0]["pending_action"], "waiting_for_response")
         self.assertEqual(response.data[1]["pending_action"], "accept_or_reject")
 
 
-class AcceptRejectFriendshipsViewTests(TestCase):
+class AcceptRejectFriendshipsViewTests(FriendshipsTestsBase):
 
     def setUp(self) -> None:
-        self.client = APIClient()
-        self.url = "/api/friendships/"
-
-        self.user = Users.objects.create_user(
-            username="testuser",
-            email="testuser@example.com",
-            first_name="Test",
-            last_name="User",
-            birthdate="1990-01-01",
-            password="Swift-1234",
-        )
-
-        another_user = Users.objects.create_user(
-            username="anotheruser",
-            email="anotheruser@example.com",
-            first_name="Another",
-            last_name="User",
-            birthdate="1990-01-01",
-            password="Swift-1234",
-        )
-
+        super().setUp()
         # Create a friendship
-        self.friendship = Friendships.objects.create(
-            user1=self.user, user2=another_user
-        )
+        self.friendship = self.create_friendship()
 
-        login_credentials = {"username_or_email": "testuser", "password": "Swift-1234"}
-        login = self.client.post("/api/login/", login_credentials)
-        self.headers = {"Authorization": f"Bearer {login.data.get('access')}"}
+        self.another_user_headers = get_auth_headers(
+            self.client, "anotheruser", "Swift-1234"
+        )
 
     def test_view_for_unauthenticated_users(self):
         response = self.client.patch(self.url)
@@ -293,21 +223,8 @@ class AcceptRejectFriendshipsViewTests(TestCase):
         )
 
     def test_accept_reject_friendships_with_unauthorized_user(self):
-        Users.objects.create_user(
-            username="unauthorizeduser",
-            email="unauthorizeduser@example.com",
-            first_name="Unauthorized",
-            last_name="User",
-            birthdate="1990-01-01",
-            password="Swift-1234",
-        )
 
-        login_credentials = {
-            "username_or_email": "unauthorizeduser",
-            "password": "Swift-1234",
-        }
-        login = self.client.post("/api/login/", login_credentials)
-        headers = {"Authorization": f"Bearer {login.data.get('access')}"}
+        headers = self.get_headers_for_unauthorized_user()
 
         actions = ["accept", "reject"]
 
@@ -326,30 +243,22 @@ class AcceptRejectFriendshipsViewTests(TestCase):
                 )
 
     def test_invalid_action(self):
-        login_credentials = {
-            "username_or_email": "anotheruser",
-            "password": "Swift-1234",
-        }
-        login = self.client.post("/api/login/", login_credentials)
-        headers = {"Authorization": f"Bearer {login.data.get('access')}"}
 
         response = self.client.patch(
-            f"{self.url}{self.friendship.id}/", {"action": "invalid"}, headers=headers
+            f"{self.url}{self.friendship.id}/",
+            {"action": "invalid"},
+            headers=self.another_user_headers,
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["detail"], "Invalid action")
 
     def test_accept_friendships(self):
-        login_credentials = {
-            "username_or_email": "anotheruser",
-            "password": "Swift-1234",
-        }
-        login = self.client.post("/api/login/", login_credentials)
-        headers = {"Authorization": f"Bearer {login.data.get('access')}"}
 
         response = self.client.patch(
-            f"{self.url}{self.friendship.id}/", {"action": "accept"}, headers=headers
+            f"{self.url}{self.friendship.id}/",
+            {"action": "accept"},
+            headers=self.another_user_headers,
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -359,15 +268,11 @@ class AcceptRejectFriendshipsViewTests(TestCase):
         )
 
     def test_reject_friendships(self):
-        login_credentials = {
-            "username_or_email": "anotheruser",
-            "password": "Swift-1234",
-        }
-        login = self.client.post("/api/login/", login_credentials)
-        headers = {"Authorization": f"Bearer {login.data.get('access')}"}
 
         response = self.client.patch(
-            f"{self.url}{self.friendship.id}/", {"action": "reject"}, headers=headers
+            f"{self.url}{self.friendship.id}/",
+            {"action": "reject"},
+            headers=self.another_user_headers,
         )
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
@@ -375,16 +280,12 @@ class AcceptRejectFriendshipsViewTests(TestCase):
         with self.assertRaises(Friendships.DoesNotExist):
             Friendships.objects.get(id=self.friendship.id)
 
-    def test_accept_friendships_with_not_existing_friendships(self):
-        login_credentials = {
-            "username_or_email": "anotheruser",
-            "password": "Swift-1234",
-        }
-        login = self.client.post("/api/login/", login_credentials)
-        headers = {"Authorization": f"Bearer {login.data.get('access')}"}
+    def test_accept_friendships_with_nonexisting_friendships(self):
 
         response = self.client.patch(
-            f"{self.url}100000/", {"action": "accept"}, headers=headers
+            f"{self.url}100000/",
+            {"action": "accept"},
+            headers=self.another_user_headers,
         )
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
@@ -393,18 +294,14 @@ class AcceptRejectFriendshipsViewTests(TestCase):
         )
 
     def test_accept_friendships_with_already_accepted_friendship(self):
-        login_credentials = {
-            "username_or_email": "anotheruser",
-            "password": "Swift-1234",
-        }
-        login = self.client.post("/api/login/", login_credentials)
-        headers = {"Authorization": f"Bearer {login.data.get('access')}"}
 
         self.friendship.status = Friendships.ACCEPTED
         self.friendship.save()
 
         response = self.client.patch(
-            f"{self.url}{self.friendship.id}/", {"action": "accept"}, headers=headers
+            f"{self.url}{self.friendship.id}/",
+            {"action": "accept"},
+            headers=self.another_user_headers,
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -414,45 +311,19 @@ class AcceptRejectFriendshipsViewTests(TestCase):
         )
 
 
-class DeleteFriendshipsViewTests(TestCase):
+class DeleteFriendshipsViewTests(FriendshipsTestsBase):
 
     def setUp(self) -> None:
-        self.client = APIClient()
-        self.url = "/api/friendships/"
-
-        self.user = Users.objects.create_user(
-            username="testuser",
-            email="testuser@example.com",
-            first_name="Test",
-            last_name="User",
-            birthdate="1990-01-01",
-            password="Swift-1234",
-        )
-
-        another_user = Users.objects.create_user(
-            username="anotheruser",
-            email="anotheruser@example.com",
-            first_name="Another",
-            last_name="User",
-            birthdate="1990-01-01",
-            password="Swift-1234",
-        )
-
+        super().setUp()
         # Create a friendship
-        self.friendship = Friendships.objects.create(
-            user1=self.user, user2=another_user
-        )
-
-        login_credentials = {"username_or_email": "testuser", "password": "Swift-1234"}
-        login = self.client.post("/api/login/", login_credentials)
-        self.headers = {"Authorization": f"Bearer {login.data.get('access')}"}
+        self.friendship = self.create_friendship()
 
     def test_view_for_unauthenticated_users(self):
         response = self.client.delete(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_delete_friendships_with_not_existing_friendships(self):
+    def test_delete_friendships_with_nonexisting_friendships(self):
         response = self.client.delete(f"{self.url}100000/", headers=self.headers)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
@@ -461,21 +332,8 @@ class DeleteFriendshipsViewTests(TestCase):
         )
 
     def test_delete_friendships_with_unauthorized_user(self):
-        Users.objects.create_user(
-            username="unauthorizeduser",
-            email="unauthorizeduser@example.com",
-            first_name="Unauthorized",
-            last_name="User",
-            birthdate="1990-01-01",
-            password="Swift-1234",
-        )
 
-        login_credentials = {
-            "username_or_email": "unauthorizeduser",
-            "password": "Swift-1234",
-        }
-        login = self.client.post("/api/login/", login_credentials)
-        headers = {"Authorization": f"Bearer {login.data.get('access')}"}
+        headers = self.get_headers_for_unauthorized_user()
 
         response = self.client.delete(
             f"{self.url}{self.friendship.id}/", headers=headers
