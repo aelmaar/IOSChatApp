@@ -4,6 +4,7 @@ from users.serializers import UsersSerializer
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+import html
 
 Users = get_user_model()
 
@@ -86,3 +87,41 @@ class ConversationsSerializer(serializers.ModelSerializer):
         conversation = Conversations.objects.create(user1=user, user2=user2)
 
         return conversation
+
+
+class MessagesSerializer(serializers.ModelSerializer):
+
+    sender = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Messages
+        fields = ["id", "conversation", "sender", "content", "created_at"]
+        read_only_fields = ["id", "conversation", "sender", "created_at"]
+
+    def get_sender(self, obj):
+        return obj.sender.username
+
+    def validate_content(self, value):
+        return html.escape(value)
+
+    def validate(self, attrs):
+        conversation_id = self.context.get("request").query_params.get(
+            "conversation_id"
+        )
+
+        conversation = get_object_or_404(Conversations, pk=conversation_id)
+
+        attrs["conversation"] = conversation
+
+        return attrs
+
+    def create(self, validated_data):
+        user = self.context.get("request").user
+        conversation = validated_data["conversation"]
+        content = validated_data["content"]
+
+        messages = Messages.objects.create(
+            conversation=conversation, sender=user, content=content
+        )
+
+        return messages
