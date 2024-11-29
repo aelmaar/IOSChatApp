@@ -10,6 +10,8 @@ class Messages(models.Model):
     conversation = models.ForeignKey("Conversations", on_delete=models.CASCADE)
     sender = models.ForeignKey(Users, null=True, on_delete=models.SET_NULL)
     content = models.TextField(blank=False, null=False)
+    IsVisibleToUser1 = models.BooleanField(default=True)
+    IsVisibleToUser2 = models.BooleanField(default=True)
     IsReadByReceiver = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 

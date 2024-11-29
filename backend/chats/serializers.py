@@ -66,15 +66,6 @@ class ConversationsSerializer(serializers.ModelSerializer):
         user = self.context.get("request").user
         user2 = get_object_or_404(Users, username=attrs["user2_username"])
 
-        # Check for existing conversation
-
-        if Conversations.objects.filter(
-            Q(user1=user, user2=user2) | Q(user1=user2, user2=user)
-        ).exists():
-            raise serializers.ValidationError(
-                "A conversation between these users already exists."
-            )
-
         attrs["user2"] = user2
 
         return attrs
