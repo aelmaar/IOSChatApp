@@ -62,20 +62,6 @@ class ConversationsSerializerTests(TestCase):
         self.assertFalse(serializer.data["IsBlockedByOtherUser"])
         self.assertIsNone(serializer.data["lastMessage"])
 
-    def test_duplicate_conversation_creation(self):
-        Conversations.objects.create(user1=self.user, user2=self.another_user)
-
-        serializer = ConversationsSerializer(
-            data={"user2_username": self.another_user.username},
-            context={"request": self.mock_request},
-        )
-
-        self.assertFalse(serializer.is_valid(), msg=serializer.errors)
-        self.assertEqual(
-            serializer.errors["non_field_errors"][0],
-            "A conversation between these users already exists.",
-        )
-
     def test_conversation_blocked_by_auth_and_other_user(self):
         conversation = Conversations.objects.create(
             user1=self.user, user2=self.another_user

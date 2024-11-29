@@ -84,6 +84,7 @@ class ConversationsView(APIView):
         conversation = get_object_or_404(Conversations, pk=pk)
         user = request.user
 
+        self.check_object_permissions(request, conversation)
         # Hide the conversation and hide too messages for the auth user
         if user == conversation.user1:
             conversation.IsVisibleToUser1 = False
