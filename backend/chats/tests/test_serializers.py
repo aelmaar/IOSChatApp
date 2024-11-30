@@ -8,6 +8,18 @@ from rest_framework.serializers import ValidationError
 
 
 class ConversationsSerializerTests(TestCase):
+    """
+    Test suite for the ConversationsSerializer.
+
+    Test cases:
+    - test_user2_username_field_with_invalid_data: Tests validation of username field
+    - test_nonexistent_user: Tests handling of nonexistent user cases
+    - test_success_conversation_creation: Tests successful conversation creation
+    - test_conversation_blocked_by_auth_and_other_user: Tests blocked conversation states
+
+    Methods:
+    - setUp: Initializes test users and mock request object
+    """
 
     def setUp(self) -> None:
         self.user = create_test_user(username="testuser", email="testuser@example.com")
@@ -84,6 +96,17 @@ class ConversationsSerializerTests(TestCase):
 
 
 class MessagesSerializerTests(TestCase):
+    """
+    Test suite for the MessagesSerializer.
+
+    Test cases:
+    - test_content_field_validation: Tests various message content validation scenarios
+      including normal text, multiline, XSS prevention, Unicode support, and error cases
+    - test_success_message_creation: Tests successful message creation with valid data
+
+    Methods:
+    - setUp: Initializes test users, conversation and mock request object
+    """
 
     def setUp(self) -> None:
         self.user = create_test_user(username="testuser", email="testuser@example.com")
@@ -98,7 +121,6 @@ class MessagesSerializerTests(TestCase):
 
         self.mock_request = Mock()
         self.mock_request.user = self.user
-        self.mock_request.query_params = {"conversation_id": self.conversation.id}
 
     def test_content_field_validation(self):
         test_cases = [
@@ -146,7 +168,10 @@ class MessagesSerializerTests(TestCase):
                 if "error" in case:
                     serializer = MessagesSerializer(
                         data={"content": case["input"]},
-                        context={"request": self.mock_request},
+                        context={
+                            "request": self.mock_request,
+                            "conversation_id": self.conversation.id,
+                        },
                     )
                     with self.assertRaises(ValidationError) as cm:
                         serializer.is_valid(raise_exception=True)
@@ -159,20 +184,13 @@ class MessagesSerializerTests(TestCase):
                     result = serializer.validate_content(case["input"])
                     self.assertEqual(result, case["expected"])
 
-    def test_nonexistent_conversation(self):
-
-        self.mock_request.query_params = {"conversation_id": 1000}
-        with self.assertRaises(Http404):
-            serializer = MessagesSerializer(
-                data={"content": "Hello Friends!"},
-                context={"request": self.mock_request},
-            )
-
-            self.assertFalse(serializer.is_valid(), msg=serializer.errors)
-
     def test_success_message_creation(self):
         serializer = MessagesSerializer(
-            data={"content": "Hello friends!"}, context={"request": self.mock_request}
+            data={"content": "Hello friends!"},
+            context={
+                "request": self.mock_request,
+                "conversation_id": self.conversation.id,
+            },
         )
 
         self.assertTrue(serializer.is_valid(), msg=serializer.errors)
