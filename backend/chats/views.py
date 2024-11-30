@@ -34,6 +34,10 @@ class ConversationsView(APIView):
         get(request): Lists all visible conversations for authenticated user
         post(request): Creates a new conversation or activates an existing one
         patch(request, pk): Hides a conversation for the authenticated user
+    
+    Permissions:
+        - Requires authentication
+        - User must be a participant in the conversation
     """
 
     permission_classes = [IsAuthenticated, IsParticipantInConversation]
@@ -113,6 +117,10 @@ class MessagesView(APIView):
         get(request, pk): Lists all visible messages in a conversation
         post(request, pk): Creates a new message in a conversation
         patch(request, pk): Handles message actions (clear chat, mark as read)
+
+    Permissions:
+        - Requires authentication
+        - User must be a participant in the conversation
     """
 
     permission_classes = [IsAuthenticated, IsParticipantInConversation]

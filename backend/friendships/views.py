@@ -14,6 +14,31 @@ logger = logging.getLogger(__name__)
 
 
 class FriendshipsView(APIView):
+    """
+    View for managing friendship relationships between users.
+
+    Methods:
+        get(request, pk=None):
+            - Without pk: Lists all friendships for authenticated user
+            - With pk: Retrieves specific friendship details
+
+        post(request): Creates a new friendship request
+
+        patch(request, pk):
+            Handles friendship request responses (accept/reject)
+            - Only recipient can accept/reject
+            - Can only act on PENDING requests
+
+        delete(request, pk):
+            Handles friendship deletions
+            - Cancels pending requests with 'cancel_pending' action
+            - Removes existing friendships
+
+    Permissions:
+        - Requires authentication
+        - User must be participant in friendship for specific friendship actions
+    """
+
     permission_classes = [IsAuthenticated, IsFriendshipParticipant]
 
     def get(self, request, pk=None):
@@ -55,7 +80,7 @@ class FriendshipsView(APIView):
                 {"detail": "The friendship has already been accepted."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         action = request.data.get("action")
         if action == "accept":
             friendship.status = Friendships.ACCEPTED

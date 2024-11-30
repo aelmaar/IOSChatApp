@@ -405,12 +405,12 @@ class BlacklistView(APIView):
         post(request):
             Handles POST requests to block a user.
             Validates the provided data using the serializer.
-            If valid, blocks the user and returns the blocked user data.
+            If valid, blocks the user, removes the friendship if exists and blocks the conversation if exists.
             If invalid, returns validation errors.
         delete(request):
             Handles DELETE requests to unblock a user.
-            If the user is blocked, unblocks the user and returns a success message.
-            If the user is not blocked, returns a 404 not found error.
+            If the user is blocked, unblocks the user and unblocks the conversation if exists.
+            If the user is not blocked, returns a 404 response.
     """
 
     def get(self, request):
