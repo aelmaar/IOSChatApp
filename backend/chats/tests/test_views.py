@@ -267,6 +267,22 @@ class MessagesViewTests(TestCase):
 
                 self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_message_creation_with_blocked_user_on_conversation(self):
+        self.conversation.IsBlockedByUser1 = True
+        self.conversation.save()
+
+        response = self.client.post(
+            f"{self.url}{self.conversation.id}/messages/",
+            {"content": "Hello world"},
+            headers=self.headers,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["non_field_errors"][0],
+            "You cannot create a converation with this user.",
+        )
+
     def test_success_message_creation(self):
         response = self.client.post(
             f"{self.url}{self.conversation.id}/messages/",

@@ -4,6 +4,7 @@ from unittest.mock import Mock
 from django.contrib.auth import get_user_model
 from django.http import Http404
 from friendships.models import Friendships
+from users.models import Blacklist
 from chat_app.helpers import create_test_user
 
 Users = get_user_model()
@@ -72,6 +73,20 @@ class FriendshipsSerializerTests(TestCase):
         self.assertFalse(serializer.is_valid(), msg=serializer.errors)
         self.assertEqual(
             serializer.errors["non_field_errors"][0], "Friendship already exists."
+        )
+
+    def test_friendship_creation_with_blocked_user(self):
+        Blacklist.objects.create(user=self.user, blocked_user=self.another_user)
+
+        serializer = FriendshipsSerializer(
+            data={"friend_username": self.another_user.username},
+            context={"request": self.mock_request},
+        )
+
+        self.assertFalse(serializer.is_valid(), msg=serializer.errors)
+        self.assertEqual(
+            serializer.errors["non_field_errors"][0],
+            "You cannot create a friendship with this user.",
         )
 
     def test_successful_friendship_creation(self):

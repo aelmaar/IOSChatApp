@@ -4,6 +4,7 @@ from users.serializers import UsersSerializer
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+from users.models import Blacklist
 import html
 
 Users = get_user_model()
@@ -99,10 +100,21 @@ class MessagesSerializer(serializers.ModelSerializer):
         """Escapes HTML in message content"""
         return html.escape(value)
 
-    def create(self, validated_data):
-        user = self.context.get("request").user
+    def validate(self, attrs):
         conversation_id = self.context.get("conversation_id")
         conversation = Conversations.objects.get(pk=conversation_id)
+
+        if conversation.IsBlockedByUser1 or conversation.IsBlockedByUser2:
+            raise serializers.ValidationError(
+                "You cannot create a converation with this user."
+            )
+
+        attrs["conversation"] = conversation
+        return attrs
+
+    def create(self, validated_data):
+        user = self.context.get("request").user
+        conversation = validated_data["conversation"]
         content = validated_data["content"]
 
         messages = Messages.objects.create(

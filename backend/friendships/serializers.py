@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import Friendships
+from users.models import Blacklist
 from users.serializers import UsersSerializer
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
@@ -23,6 +24,7 @@ class FriendshipsSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "friend", "status", "pending_action"]
 
     def get_friend(self, obj):
+        """Return the serialized data of the auth user's friend"""
         user = self.context.get("request").user
         if user == obj.user1:
             return UsersSerializer(obj.user2).data
@@ -30,7 +32,8 @@ class FriendshipsSerializer(serializers.ModelSerializer):
             return UsersSerializer(obj.user1).data
 
     def get_pending_action(self, obj):
-        user = self.context.get('request').user
+        """Return whether the auth user should accept/reject the friendship or is in pending"""
+        user = self.context.get("request").user
 
         if obj.status == Friendships.PENDING:
             if user == obj.user2:
@@ -48,6 +51,14 @@ class FriendshipsSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         user = self.context.get("request").user
         friend_user = get_object_or_404(Users, username=attrs["friend_username"])
+
+        if Blacklist.objects.filter(
+            Q(user=user, blocked_user=friend_user)
+            | Q(user=friend_user, blocked_user=user)
+        ).exists():
+            raise serializers.ValidationError(
+                "You cannot create a friendship with this user."
+            )
 
         if Friendships.objects.filter(
             Q(user1=user, user2=friend_user) | Q(user1=friend_user, user2=user)

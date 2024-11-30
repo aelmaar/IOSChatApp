@@ -184,6 +184,24 @@ class MessagesSerializerTests(TestCase):
                     result = serializer.validate_content(case["input"])
                     self.assertEqual(result, case["expected"])
 
+    def test_message_creation_with_blocked_user_on_conversation(self):
+        self.conversation.IsBlockedByUser1 = True
+        self.conversation.save()
+
+        serializer = MessagesSerializer(
+            data={"content": "Hello friends!"},
+            context={
+                "request": self.mock_request,
+                "conversation_id": self.conversation.id,
+            },
+        )
+
+        self.assertFalse(serializer.is_valid(), msg=serializer.errors)
+        self.assertEqual(
+            serializer.errors["non_field_errors"][0],
+            "You cannot create a converation with this user.",
+        )
+
     def test_success_message_creation(self):
         serializer = MessagesSerializer(
             data={"content": "Hello friends!"},

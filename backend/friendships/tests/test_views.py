@@ -3,6 +3,7 @@ from rest_framework import status
 from chat_app.helpers import create_test_user, get_auth_headers
 from users.serializers import UsersSerializer
 from .test_helpers import FriendshipsTestsBase, Friendships
+from users.models import Blacklist
 
 Users = get_user_model()
 
@@ -68,6 +69,21 @@ class CreateFriendshipsViewTests(FriendshipsTestsBase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(
             response.data["non_field_errors"][0], "Friendship already exists."
+        )
+
+    def test_friendship_creation_with_blocked_user(self):
+        Blacklist.objects.create(user=self.user, blocked_user=self.another_user)
+
+        response = self.client.post(
+            self.url,
+            {"friend_username": self.another_user.username},
+            headers=self.headers,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["non_field_errors"][0],
+            "You cannot create a friendship with this user.",
         )
 
     def test_successful_friendships_creation(self):
