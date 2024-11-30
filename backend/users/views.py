@@ -18,8 +18,11 @@ from rest_framework.permissions import IsAuthenticated
 from django.conf import settings
 from rest_framework.serializers import ValidationError
 from users.models import Users, Blacklist
+from friendships.models import Friendships
+from chats.models import Conversations
 from django.utils.crypto import get_random_string
 from django.core.files.storage import default_storage
+from django.db.models import Q
 import requests
 import logging
 import random
@@ -312,6 +315,7 @@ class UpdateProfileView(APIView):
             If valid, updates the user profile and returns the updated data.
             If invalid, returns validation errors.
     """
+
     def patch(self, request, *args, **kwargs):
         serializer = UpdateProfileSerializer(
             data=request.data, context={"request": request}
@@ -334,6 +338,7 @@ class UpdatePasswordView(APIView):
             If valid, updates the user password and returns a success message.
             If invalid, returns validation errors.
     """
+
     def patch(self, request, *args, **kwargs):
         serializer = UpdatePasswordSerializer(
             data=request.data, context={"request": request}
@@ -358,6 +363,7 @@ class UpdatePictureView(APIView):
             If valid, updates the user profile picture and returns the updated data.
             If invalid, returns validation errors.
     """
+
     def patch(self, request, *args, **kwargs):
         serializer = UpdatePictureSerializer(
             data=request.data, context={"request": request}
@@ -378,6 +384,7 @@ class DeletePictureView(APIView):
             If the user has a profile picture, deletes the picture and returns a success message.
             If the user does not have a profile picture, returns a success message.
     """
+
     def delete(self, request, *args, **kwargs):
         user = request.user
         if user.picture and default_storage.exists(user.picture.path):
@@ -405,6 +412,7 @@ class BlacklistView(APIView):
             If the user is blocked, unblocks the user and returns a success message.
             If the user is not blocked, returns a 404 not found error.
     """
+
     def get(self, request):
         blocked_users = Blacklist.objects.filter(user=request.user)
         serializer = BlacklistSerializer(
@@ -417,19 +425,52 @@ class BlacklistView(APIView):
             data=request.data, context={"request": request}
         )
         if serializer.is_valid():
-            serializer.save()
+            blacklisted_obj = serializer.save()
+            self.remove_friendship_if_exists(blacklisted_obj)
+            self.block_unblock_conversation_if_exists(blacklisted_obj)
+
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request):
         blocked_username = request.data.get("blocked_username")
 
-        blocked_user = Blacklist.objects.filter(
+        blacklisted_obj = Blacklist.objects.filter(
             user=request.user,
             blocked_user=Users.objects.filter(username=blocked_username).first(),
         ).first()
 
-        if blocked_user:
-            blocked_user.delete()
+        if blacklisted_obj:
+            self.block_unblock_conversation_if_exists(blacklisted_obj, value=False)
+            blacklisted_obj.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response(status=status.HTTP_404_NOT_FOUND)
+
+    def remove_friendship_if_exists(self, blacklisted_obj: Blacklist) -> None:
+        """Delete friendship if exists"""
+        user = blacklisted_obj.user
+        blocked_user = blacklisted_obj.blocked_user
+        friendship = Friendships.objects.filter(
+            Q(user1=user, user2=blocked_user) | Q(user1=blocked_user, user2=user)
+        ).first()
+
+        if friendship:
+            friendship.delete()
+
+    def block_unblock_conversation_if_exists(
+        self, blacklisted_obj: Blacklist, value=True
+    ) -> None:
+        """Block or unblock a conversation if exists for the auth user"""
+        user = blacklisted_obj.user
+        blocked_user = blacklisted_obj.blocked_user
+
+        conversation = Conversations.objects.filter(
+            Q(user1=user, user2=blocked_user) | Q(user1=blocked_user, user2=user)
+        ).first()
+
+        if conversation:
+            if user == conversation.user1:
+                conversation.IsBlockedByUser1 = value
+            else:
+                conversation.IsBlockedByUser2 = value
+            conversation.save()

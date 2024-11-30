@@ -9,6 +9,8 @@ from io import BytesIO
 from django.core.files.uploadedfile import SimpleUploadedFile
 from users.serializers import UsersSerializer
 from chat_app.helpers import get_auth_headers, create_test_user
+from friendships.models import Friendships
+from chats.models import Conversations
 import os
 
 
@@ -40,15 +42,6 @@ class RegisterViewTests(TestCase):
             "password": "Swift-1234",
             "confirm_password": "Swift-1234",
         }
-
-        # Users.objects.create_user(
-        #     username="differentuser",
-        #     email="differentuser@example.com",
-        #     first_name="differentuser",
-        #     last_name="differentuser",
-        #     birthdate="1990-01-01",
-        #     password="Swift-1234",
-        # )
 
         create_test_user(username="differentuser", email="differentuser@example.com")
 
@@ -686,11 +679,8 @@ class BlacklistViewTests(TestCase):
         self.url = "/api/blacklist/"
 
         self.user = create_test_user("testuser", "testuser@example.com")
-
         self.second_user = create_test_user("seconduser", "seconduser@example.com")
-
         self.third_user = create_test_user("thirduser", "thirduser@example.com")
-
         self.headers = get_auth_headers(self.client, "testuser", "Swift-1234")
 
     def test_view_for_unauthenticated_users(self):
@@ -750,6 +740,11 @@ class BlacklistViewTests(TestCase):
         )
 
     def test_block_user_success(self):
+        conversation = Conversations.objects.create(
+            user1=self.user, user2=self.second_user
+        )
+
+        friendship = Friendships.objects.create(user1=self.user, user2=self.second_user)
 
         response = self.client.post(
             self.url,
@@ -761,6 +756,11 @@ class BlacklistViewTests(TestCase):
         self.assertEqual(
             response.data["blocked_user"], UsersSerializer(self.second_user).data
         )
+        # Check that Friendship does not exist after blocking a user and conversation is blocked for the auth user
+        conversation.refresh_from_db()
+        with self.assertRaises(Friendships.DoesNotExist):
+            Friendships.objects.get(pk=friendship.id)
+        self.assertTrue(conversation.IsBlockedByUser1)
 
     def test_list_empty_blocks(self):
 
@@ -794,6 +794,9 @@ class BlacklistViewTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_unblock_user_success(self):
+        conversation = Conversations.objects.create(
+            user1=self.user, user2=self.second_user
+        )
 
         Blacklist.objects.create(user=self.user, blocked_user=self.second_user)
 
@@ -805,3 +808,6 @@ class BlacklistViewTests(TestCase):
 
         with self.assertRaises(Blacklist.DoesNotExist):
             Blacklist.objects.get(user=self.user, blocked_user=self.second_user)
+
+        conversation.refresh_from_db()
+        self.assertFalse(conversation.IsBlockedByUser1)
