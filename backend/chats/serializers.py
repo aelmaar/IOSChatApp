@@ -38,6 +38,7 @@ class ConversationsSerializer(serializers.ModelSerializer):
         ]
 
     def get_user(self, obj):
+        """Get serialized data of other conversation participant"""
         user = self.context.get("request").user
         if user == obj.user1:
             return UsersSerializer(obj.user2).data
@@ -45,6 +46,7 @@ class ConversationsSerializer(serializers.ModelSerializer):
             return UsersSerializer(obj.user1).data
 
     def get_IsBlockedByMe(self, obj):
+        """Check if auth user blocked conversation"""
         user = self.context.get("request").user
 
         if user == obj.user1 and obj.IsBlockedByUser1:
@@ -54,6 +56,7 @@ class ConversationsSerializer(serializers.ModelSerializer):
         return False
 
     def get_IsBlockedByOtherUser(self, obj):
+        """Check if other user blocked conversation"""
         user = self.context.get("request").user
 
         if user == obj.user1 and obj.IsBlockedByUser2:
@@ -93,22 +96,13 @@ class MessagesSerializer(serializers.ModelSerializer):
         return obj.sender.username
 
     def validate_content(self, value):
+        """Escapes HTML in message content"""
         return html.escape(value)
-
-    def validate(self, attrs):
-        conversation_id = self.context.get("request").query_params.get(
-            "conversation_id"
-        )
-
-        conversation = get_object_or_404(Conversations, pk=conversation_id)
-
-        attrs["conversation"] = conversation
-
-        return attrs
 
     def create(self, validated_data):
         user = self.context.get("request").user
-        conversation = validated_data["conversation"]
+        conversation_id = self.context.get("conversation_id")
+        conversation = Conversations.objects.get(pk=conversation_id)
         content = validated_data["content"]
 
         messages = Messages.objects.create(

@@ -14,9 +14,7 @@ class MessagesService:
     @staticmethod
     def mark_messages_as_read(receiver, conversation):
         """Read unread messages for the receiver"""
-        conversation.messages_set.all().exclude(sender=receiver).update(
-            IsReadByReceiver=True
-        )
+        conversation.messages_set.exclude(sender=receiver).update(IsReadByReceiver=True)
 
     @staticmethod
     def hide_messages_for_user(user, conversation):
@@ -29,6 +27,15 @@ class MessagesService:
 
 
 class ConversationsView(APIView):
+    """
+    View for managing conversations between users.
+
+    Methods:
+        get(request): Lists all visible conversations for authenticated user
+        post(request): Creates a new conversation or activates an existing one
+        patch(request, pk): Hides a conversation for the authenticated user
+    """
+
     permission_classes = [IsAuthenticated, IsParticipantInConversation]
 
     def get(self, request):
@@ -95,4 +102,69 @@ class ConversationsView(APIView):
 
         conversation.save()
 
-        return Response(status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class MessagesView(APIView):
+    """
+    View for managing messages within conversations.
+
+    Methods:
+        get(request, pk): Lists all visible messages in a conversation
+        post(request, pk): Creates a new message in a conversation
+        patch(request, pk): Handles message actions (clear chat, mark as read)
+    """
+
+    permission_classes = [IsAuthenticated, IsParticipantInConversation]
+
+    def get(self, request, pk):
+        user = request.user
+        conversation = get_object_or_404(Conversations, pk=pk)
+        self.check_object_permissions(request, conversation)
+
+        if user == conversation.user1:
+            messages = conversation.messages_set.filter(IsVisibleToUser1=True)
+        else:
+            messages = conversation.messages_set.filter(IsVisibleToUser2=True)
+
+        # Mark messages as read by the auth user
+        MessagesService.mark_messages_as_read(user, conversation)
+
+        serializer = MessagesSerializer(messages, many=True)
+
+        return Response(serializer.data)
+
+    def post(self, request, pk):
+        conversation = get_object_or_404(Conversations, pk=pk)
+        self.check_object_permissions(request, conversation)
+
+        serializer = MessagesSerializer(
+            data=request.data,
+            context={"request": request, "conversation_id": conversation.id},
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request, pk):
+        conversation = get_object_or_404(Conversations, pk=pk)
+        self.check_object_permissions(request, conversation)
+        action = request.data.get("action")
+        user = request.user
+
+        if action == "clear_chat":
+            if user == conversation.user1:
+                conversation.messages_set.all().update(IsVisibleToUser1=False)
+            else:
+                conversation.messages_set.all().update(IsVisibleToUser2=False)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        elif action == "read_messages":
+            MessagesService.mark_messages_as_read(user, conversation)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        return Response(
+            {"detail": "Invalid action."}, status=status.HTTP_400_BAD_REQUEST
+        )

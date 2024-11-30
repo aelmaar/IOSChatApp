@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import ConversationsView
+from .views import ConversationsView, MessagesView
 
 urlpatterns = [
     path(
@@ -10,4 +10,5 @@ urlpatterns = [
         ConversationsView.as_view(),
         name="delete-conversation",
     ),
+    path("conversations/<int:pk>/messages/", MessagesView.as_view(), name="messages"),
 ]

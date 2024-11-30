@@ -15,6 +15,9 @@ class Messages(models.Model):
     IsReadByReceiver = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return f"Message sent by {self.sender.username}"
+
 
 class Conversations(models.Model):
     user1 = models.ForeignKey(
