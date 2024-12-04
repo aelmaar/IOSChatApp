@@ -7,7 +7,9 @@ from .views import (
     UpdatePasswordView,
     UpdatePictureView,
     DeletePictureView,
-    BlacklistView
+    BlacklistView,
+    UsersSearchView,
+    UserProfileView,
 )
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -26,5 +28,7 @@ urlpatterns = [
     path("update-password/", UpdatePasswordView.as_view(), name="update-password"),
     path("update-picture/", UpdatePictureView.as_view(), name="update-picture"),
     path("delete-picture/", DeletePictureView.as_view(), name="delete-picture"),
-    path("blacklist/", BlacklistView.as_view(), name="blacklist")
+    path("blacklist/", BlacklistView.as_view(), name="blacklist"),
+    path("users/search/", UsersSearchView.as_view(), name="search-users"),
+    path("users/<str:username>/", UserProfileView.as_view(), name="user-profile"),
 ]

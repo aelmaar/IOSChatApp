@@ -10,6 +10,7 @@ from .serializers import (
     UpdatePasswordSerializer,
     UpdatePictureSerializer,
     BlacklistSerializer,
+    UsersSerializer,
 )
 from .models import Users
 from chat_app.permissions import IsUnauthenticated
@@ -23,6 +24,8 @@ from chats.models import Conversations
 from django.utils.crypto import get_random_string
 from django.core.files.storage import default_storage
 from django.db.models import Q
+from django.shortcuts import get_object_or_404
+from django.http import Http404
 import requests
 import logging
 import random
@@ -474,3 +477,56 @@ class BlacklistView(APIView):
             else:
                 conversation.IsBlockedByUser2 = value
             conversation.save()
+
+
+class UsersSearchView(APIView):
+
+    def get(self, request):
+        """Filter by username or by full name"""
+        value = request.query_params.get("q", "")
+        user = request.user
+
+        filtered_users = Users.objects.filter(
+            Q(username__startswith=value)
+            | Q(first_name__icontains=value)
+            | Q(last_name__icontains=value)
+        )
+
+        if filtered_users:
+            # Get users blocked by auth user
+            blocked_users = Blacklist.objects.filter(user=user).values_list(
+                "blocked_user__username", flat=True
+            )
+            # Get users who block auth user
+            blocking_users = Blacklist.objects.filter(blocked_user=user).values_list(
+                "user__username", flat=True
+            )
+
+            # Exclude blocked/blocking users but not auth user
+            filtered_users = filtered_users.exclude(
+                username__in=list(blocked_users) + list(blocking_users)
+            )[:10]
+
+        serializer = UsersSerializer(filtered_users, many=True)
+
+        return Response(serializer.data)
+
+
+class UserProfileView(APIView):
+
+    def get(self, request, username):
+
+        user = get_object_or_404(Users, username=username)
+
+        # Check whether the user's username is blocked or get blocked by the auth
+        is_blocked = Blacklist.objects.filter(
+            Q(user=request.user, blocked_user=user)
+            | Q(user=user, blocked_user=request.user)
+        ).exists()
+
+        if is_blocked:
+            raise Http404("User not found.")
+
+        serializer = UsersSerializer(user)
+
+        return Response(serializer.data)
