@@ -756,7 +756,8 @@ class BlacklistViewTests(TestCase):
         self.assertEqual(
             response.data["blocked_user"], UsersSerializer(self.second_user).data
         )
-        # Check that Friendship does not exist after blocking a user and conversation is blocked for the auth user
+        # Check that Friendship does not exist after blocking a user 
+        # and conversation is blocked for the auth user
         conversation.refresh_from_db()
         with self.assertRaises(Friendships.DoesNotExist):
             Friendships.objects.get(pk=friendship.id)
@@ -811,3 +812,103 @@ class BlacklistViewTests(TestCase):
 
         conversation.refresh_from_db()
         self.assertFalse(conversation.IsBlockedByUser1)
+
+
+class UsersSearchViewTests(TestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+        self.url = "/api/users/search/"
+        self.user = create_test_user(username="testuser", email="testuser@example.com")
+        self.headers = get_auth_headers(self.client, "testuser", "Swift-1234")
+
+        # Create multiple users
+        create_test_user(
+            username="seconduser", email="seconduser@example.com", first_name="Second"
+        )
+        create_test_user(
+            username="thirduser", email="thirduser@example.com", first_name="Third"
+        )
+
+    def test_view_with_nonauthenticated_users(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_search_nonexistent_user(self):
+        response = self.client.get(
+            f"{self.url}?q=nonexistentuser", headers=self.headers
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(len(response.data) == 0)
+
+    def test_success_users_search(self):
+
+        response = self.client.get(f"{self.url}?q=user", headers=self.headers)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(len(response.data) == 3)
+
+    def test_search_blocked_users(self):
+        second_user = Users.objects.get(username="seconduser")
+        third_user = Users.objects.get(username="thirduser")
+
+        # Create some blocked user
+        Blacklist.objects.create(user=self.user, blocked_user=second_user)
+        Blacklist.objects.create(user=self.user, blocked_user=third_user)
+
+        response = self.client.get(f"{self.url}?q=user", headers=self.headers)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Only the user auth is included
+        self.assertTrue(len(response.data) == 1)
+        self.assertEqual(response.data[0]["username"], self.user.username)
+
+    def test_search_users_with_limit_10(self):
+        # Create 10 more users
+        for i in range(10):
+            create_test_user(username=f"testuser{i}", email=f"testuser{i}@example.com")
+
+        response = self.client.get(f"{self.url}?q=user", headers=self.headers)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(len(response.data) == 10)
+
+
+class UserProfileViewTests(TestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+        self.url = "/api/users/"
+        self.user = create_test_user(username="testuser", email="testuser@example.com")
+        self.headers = get_auth_headers(self.client, "testuser", "Swift-1234")
+
+    def test_view_with_nonauthenticated_users(self):
+        response = self.client.get(f"{self.url}testuser/")
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_retrieve_nonexistent_profile_user(self):
+
+        response = self.client.get(f"{self.url}nonexistentuser/", headers=self.headers)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_success_retrieve_profile_user(self):
+        response = self.client.get(f"{self.url}testuser/", headers=self.headers)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["username"], "testuser")
+
+    def test_retrieve_blocked_profile_user(self):
+        second_user = create_test_user(
+            username="seconduser", email="seconduser@example.com", first_name="Second"
+        )
+
+        Blacklist.objects.create(user=self.user, blocked_user=second_user)
+
+        response = self.client.get(f"{self.url}seconduser/", headers=self.headers)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data["detail"], "User not found.")
