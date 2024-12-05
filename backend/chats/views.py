@@ -34,7 +34,7 @@ class ConversationsView(APIView):
         get(request): Lists all visible conversations for authenticated user
         post(request): Creates a new conversation or activates an existing one
         patch(request, pk): Hides a conversation for the authenticated user
-    
+
     Permissions:
         - Requires authentication
         - User must be a participant in the conversation
@@ -47,7 +47,8 @@ class ConversationsView(APIView):
 
         conversations = Conversations.objects.filter(
             Q(user1=user, IsVisibleToUser1=True) | Q(user2=user, IsVisibleToUser2=True)
-        )
+        ).order_by("lastMessageTimestamp")
+
         serializer = ConversationsSerializer(
             conversations, many=True, context={"request": request}
         )
@@ -91,7 +92,7 @@ class ConversationsView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def patch(self, request, pk):
+    def patch(self, request, pk=None):
         conversation = get_object_or_404(Conversations, pk=pk)
         user = request.user
 
@@ -153,6 +154,8 @@ class MessagesView(APIView):
 
         if serializer.is_valid():
             serializer.save()
+            conversation.lastMessage = serializer.instance
+            conversation.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

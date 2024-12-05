@@ -3,8 +3,6 @@ from chats.models import Conversations, Messages
 from users.serializers import UsersSerializer
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
-from django.db.models import Q
-from users.models import Blacklist
 import html
 
 Users = get_user_model()
@@ -19,6 +17,7 @@ class ConversationsSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
     IsBlockedByMe = serializers.SerializerMethodField()
     IsBlockedByOtherUser = serializers.SerializerMethodField()
+    lastMessage = serializers.SerializerMethodField()
 
     class Meta:
         model = Conversations
@@ -40,11 +39,12 @@ class ConversationsSerializer(serializers.ModelSerializer):
 
     def get_user(self, obj):
         """Get serialized data of other conversation participant"""
-        user = self.context.get("request").user
+        request = self.context.get("request")
+        user = request.user
         if user == obj.user1:
-            return UsersSerializer(obj.user2).data
+            return UsersSerializer(obj.user2, context={"request": request}).data
         else:
-            return UsersSerializer(obj.user1).data
+            return UsersSerializer(obj.user1, context={"request": request}).data
 
     def get_IsBlockedByMe(self, obj):
         """Check if auth user blocked conversation"""
@@ -66,8 +66,11 @@ class ConversationsSerializer(serializers.ModelSerializer):
             return True
         return False
 
+    def get_lastMessage(self, obj):
+        """Get the message content"""
+        return obj.lastMessage.content if obj.lastMessage else None
+
     def validate(self, attrs):
-        user = self.context.get("request").user
         user2 = get_object_or_404(Users, username=attrs["user2_username"])
 
         attrs["user2"] = user2
