@@ -419,7 +419,7 @@ class BlacklistView(APIView):
     def get(self, request):
         blocked_users = Blacklist.objects.filter(user=request.user)
         serializer = BlacklistSerializer(
-            blocked_users, many=True, context={"request", request}
+            blocked_users, many=True, context={"request": request}
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -482,15 +482,28 @@ class BlacklistView(APIView):
 class UsersSearchView(APIView):
 
     def get(self, request):
-        """Filter by username or by full name"""
-        value = request.query_params.get("q", "")
+        """Filter by username or by full name separated by spaces"""
+        value = request.query_params.get("q", "").strip()
         user = request.user
 
-        filtered_users = Users.objects.filter(
-            Q(username__startswith=value)
-            | Q(first_name__icontains=value)
-            | Q(last_name__icontains=value)
-        )
+        # Handle full name search with spaces
+        name_parts = value.split()
+        if len(name_parts) > 1:
+            first_name = name_parts[0]
+            last_name = " ".join(name_parts[1:])  # Join rest of parts for last name
+            filtered_users = Users.objects.filter(
+                Q(username__istartswith=value)
+                | (
+                    Q(first_name__icontains=first_name)
+                    & Q(last_name__icontains=last_name)
+                )
+            )
+        else:
+            # Single word search
+            filtered_users = Users.objects.filter(
+                Q(username__istartswith=value)
+                | (Q(first_name__icontains=value) & Q(last_name__icontains=value))
+            )
 
         if filtered_users:
             # Get users blocked by auth user
@@ -507,7 +520,9 @@ class UsersSearchView(APIView):
                 username__in=list(blocked_users) + list(blocking_users)
             )[:10]
 
-        serializer = UsersSerializer(filtered_users, many=True)
+        serializer = UsersSerializer(
+            filtered_users, many=True, context={"request": request}
+        )
 
         return Response(serializer.data)
 
@@ -527,6 +542,6 @@ class UserProfileView(APIView):
         if is_blocked:
             raise Http404("User not found.")
 
-        serializer = UsersSerializer(user)
+        serializer = UsersSerializer(user, context={"request": request})
 
         return Response(serializer.data)
