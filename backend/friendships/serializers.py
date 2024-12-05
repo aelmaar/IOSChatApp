@@ -25,11 +25,12 @@ class FriendshipsSerializer(serializers.ModelSerializer):
 
     def get_friend(self, obj):
         """Return the serialized data of the auth user's friend"""
-        user = self.context.get("request").user
+        request = self.context.get("request")
+        user = request.user
         if user == obj.user1:
-            return UsersSerializer(obj.user2).data
+            return UsersSerializer(obj.user2, context={"request": request}).data
         else:
-            return UsersSerializer(obj.user1).data
+            return UsersSerializer(obj.user1, context={"request": request}).data
 
     def get_pending_action(self, obj):
         """Return whether the auth user should accept/reject the friendship or is in pending"""

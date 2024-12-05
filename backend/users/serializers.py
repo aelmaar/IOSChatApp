@@ -20,10 +20,17 @@ logger = logging.getLogger(__name__)
 
 class UsersSerializer(serializers.ModelSerializer):
 
+    picture = serializers.SerializerMethodField()
+
     class Meta:
         model = Users
         fields = ["username", "first_name", "last_name", "birthdate", "picture"]
         read_only_fields = fields
+
+    def get_picture(self, obj):
+        request = self.context.get("request")
+
+        return request.build_absolute_uri(obj.picture.url) if obj.picture else None
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -327,8 +334,6 @@ class BlacklistSerializer(serializers.ModelSerializer):
         required=True, max_length=30, write_only=True
     )
 
-    blocked_user = UsersSerializer(read_only=True)
-
     class Meta:
         model = Blacklist
         fields = ["blocked_user", "created_at", "blocked_username"]
@@ -358,3 +363,13 @@ class BlacklistSerializer(serializers.ModelSerializer):
         blacklist = Blacklist.objects.create(user=user, blocked_user=blocked_user)
 
         return blacklist
+
+    def to_representation(self, instance):
+        request = self.context.get("request")
+        representation = super().to_representation(instance)
+
+        representation["blocked_user"] = UsersSerializer(
+            instance.blocked_user, context={"request": request}
+        ).data
+
+        return representation
