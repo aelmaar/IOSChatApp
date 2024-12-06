@@ -13,6 +13,7 @@ services:
     volumes:
       - ../backend:/app
       - ../backend/logs:/var/log/gunicorn
+      - ../backend/logs:/var/log/cron
 
   postgres:
     image: postgres:latest

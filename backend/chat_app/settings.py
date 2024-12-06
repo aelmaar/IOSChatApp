@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "friendships.apps.FriendshipsConfig",
     "notifications.apps.NotificationsConfig",
     "rest_framework",
+    "django_crontab",
 ]
 
 MIDDLEWARE = [
@@ -140,8 +141,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 AUTH_USER_MODEL = "users.Users"
 
@@ -149,9 +150,7 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-    'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
-    )
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
 }
 
 AUTHENTICATION_BACKENDS = [
@@ -167,15 +166,40 @@ SIMPLE_JWT = {
 }
 
 # Credentials for Google OAuth
-GOOGLE_CLIENT_ID=env('GOOGLE_CLIENT_ID')
-GOOGLE_CLIENT_SECRET=env('GOOGLE_CLIENT_SECRET')
-GOOGLE_REDIRECT_URI=env('GOOGLE_REDIRECT_URI')
-GOOGLE_AUTH_URI=env('GOOGLE_AUTH_URI')
-GOOGLE_TOKEN_URI=env('GOOGLE_TOKEN_URI')
+GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET")
+GOOGLE_REDIRECT_URI = env("GOOGLE_REDIRECT_URI")
+GOOGLE_AUTH_URI = env("GOOGLE_AUTH_URI")
+GOOGLE_TOKEN_URI = env("GOOGLE_TOKEN_URI")
 
 # Credentials for 42 intranet
-CLIENT_42_ID=env('CLIENT_42_ID')
-CLIENT_42_SECRET=env('CLIENT_42_SECRET')
-REDIRECT_42_URI=env('REDIRECT_42_URI')
-AUTH_42_URI=env('AUTH_42_URI')
-TOKEN_42_URI=env('TOKEN_42_URI')
+CLIENT_42_ID = env("CLIENT_42_ID")
+CLIENT_42_SECRET = env("CLIENT_42_SECRET")
+REDIRECT_42_URI = env("REDIRECT_42_URI")
+AUTH_42_URI = env("AUTH_42_URI")
+TOKEN_42_URI = env("TOKEN_42_URI")
+
+
+# Cronjob
+CRONJOBS = [
+    ("0 0 * * *", "django.core.management.call_command", ["cleanup_conversations"])
+]
+
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "file": {
+            "level": "INFO",
+            "class": "logging.FileHandler",
+            "filename": "/var/log/cron/django-cron.log",
+        },
+    },
+    "loggers": {
+        "chats.management.commands.cleanup_conversations": {
+            "handlers": ["file"],
+            "level": "INFO",
+        },
+    },
+}

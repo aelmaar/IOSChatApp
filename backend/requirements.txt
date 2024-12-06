@@ -6,3 +6,4 @@ djangorestframework-simplejwt
 gunicorn
 requests
 pillow
+django-crontab
