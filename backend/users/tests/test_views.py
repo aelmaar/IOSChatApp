@@ -756,7 +756,7 @@ class BlacklistViewTests(TestCase):
         self.assertEqual(
             response.data["blocked_user"], UsersSerializer(self.second_user).data
         )
-        # Check that Friendship does not exist after blocking a user 
+        # Check that Friendship does not exist after blocking a user
         # and conversation is blocked for the auth user
         conversation.refresh_from_db()
         with self.assertRaises(Friendships.DoesNotExist):
@@ -912,3 +912,26 @@ class UserProfileViewTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(response.data["detail"], "User not found.")
+
+
+class DeleteAccountViewTests(TestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+        self.url = "/api/delete-account/"
+
+    def test_view_for_non_authenticated_users(self):
+        response = self.client.delete(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_delete_user_account(self):
+        user = create_test_user(username="testuser", email="testuser@example.com")
+        headers = get_auth_headers(self.client, "testuser", "Swift-1234")
+
+        response = self.client.delete(self.url, headers=headers)
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        with self.assertRaises(Users.DoesNotExist):
+            Users.objects.get(pk=user.id)
