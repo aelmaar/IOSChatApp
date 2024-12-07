@@ -185,7 +185,7 @@ CRONJOBS = [
     ("0 0 * * *", "django.core.management.call_command", ["cleanup_conversations"])
 ]
 
-
+# Logger for cleanup_conversations command
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
