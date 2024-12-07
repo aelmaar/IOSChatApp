@@ -10,6 +10,7 @@ from .views import (
     BlacklistView,
     UsersSearchView,
     UserProfileView,
+    DeleteAccountView,
 )
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -31,4 +32,5 @@ urlpatterns = [
     path("blacklist/", BlacklistView.as_view(), name="blacklist"),
     path("users/search/", UsersSearchView.as_view(), name="search-users"),
     path("users/<str:username>/", UserProfileView.as_view(), name="user-profile"),
+    path("delete-account/", DeleteAccountView.as_view(), name="delete-account"),
 ]

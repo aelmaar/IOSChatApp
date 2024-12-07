@@ -545,3 +545,13 @@ class UserProfileView(APIView):
         serializer = UsersSerializer(user, context={"request": request})
 
         return Response(serializer.data)
+
+
+class DeleteAccountView(APIView):
+    """Delete user's account"""
+    def delete(self, request):
+        user = request.user
+
+        user.delete()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
