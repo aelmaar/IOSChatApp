@@ -12,6 +12,7 @@ class Users(AbstractUser):
     birthdate = models.DateField(null=True, blank=True)
     picture = models.ImageField(upload_to="profile_pictures/", blank=True, null=True)
     IsOAuth = models.BooleanField(default=False)
+    IsOnline = models.BooleanField(default=False)
 
     # Avoid clashes with the 'groups' and 'user_permissions' fields in the Django AbstractUser class
     groups = models.ManyToManyField(

@@ -13,6 +13,8 @@ from django.contrib.auth import authenticate
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.shortcuts import get_object_or_404
+from friendships.models import Friendships
+from django.db.models import Q
 import logging
 
 logger = logging.getLogger(__name__)
@@ -31,6 +33,26 @@ class UsersSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
 
         return request.build_absolute_uri(obj.picture.url) if obj.picture else None
+
+    def to_representation(self, instance):
+        """
+        Overrides the default to_representation method to add the IsOnline field to the representation.
+        """
+        user = self.context.get("request").user
+        representation = super().to_representation(instance)
+
+        # Check whether it's the auth user then display the online status
+        if user.username == instance.username:
+            representation["IsOnline"] = instance.IsOnline
+
+        # Check whether the user is a friend then display it's online status
+        if Friendships.objects.filter(
+            Q(user1=user, user2=instance) | Q(user1=instance, user2=user),
+            status=Friendships.ACCEPTED,
+        ).exists():
+            representation["IsOnline"] = instance.IsOnline
+
+        return representation
 
 
 class RegisterSerializer(serializers.ModelSerializer):

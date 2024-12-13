@@ -9,6 +9,7 @@ from users.serializers import (
 )
 from django.test import TestCase
 from users.models import Users, Blacklist
+from friendships.models import Friendships
 import os
 from .test_helpers import create_test_image, delete_test_images
 from io import BytesIO
@@ -467,19 +468,55 @@ class UpdatePictureSerializerTests(TestCase):
 
 class UsersSerializerTests(TestCase):
 
+    def setUp(self):
+        self.user = create_test_user(username="testuser", email="testuser@example.com")
+        self.another_user = create_test_user(
+            username="anotheruser", email="anotheruser@example.com"
+        )
+
+        # Create Friendship
+        self.friendship = Friendships.objects.create(
+            user1=self.user, user2=self.another_user
+        )
+
+        self.mock_request = Mock()
+        self.mock_request.user = self.user
+
     def test_display_user_info(self):
         picture = create_test_image(1)
-        user = create_test_user(username="testuser", email="testuser@example.com")
 
-        user.picture = picture
-        user.save()
+        self.user.picture = picture
+        self.user.save()
 
-        serializer = UsersSerializer(user)
-        self.assertEqual(serializer.data["username"], user.username)
-        self.assertEqual(serializer.data["first_name"], user.first_name)
-        self.assertEqual(serializer.data["last_name"], user.last_name)
-        self.assertEqual(serializer.data["birthdate"], user.birthdate)
-        self.assertEqual(serializer.data["picture"], user.picture.url)
+        # Configure mock to return specific URL when build_absolute_uri is called
+        expected_url = f"http://localhost:8081/{self.user.picture.url}"
+        self.mock_request.build_absolute_uri = Mock(return_value=expected_url)
+
+        serializer = UsersSerializer(self.user, context={"request": self.mock_request})
+        self.assertEqual(serializer.data["username"], self.user.username)
+        self.assertEqual(serializer.data["first_name"], self.user.first_name)
+        self.assertEqual(serializer.data["last_name"], self.user.last_name)
+        self.assertEqual(serializer.data["birthdate"], self.user.birthdate)
+        self.assertEqual(serializer.data["picture"], expected_url)
+        self.assertEqual(serializer.data["IsOnline"], self.user.IsOnline)
+
+    def test_not_display_online_status_of_unfriend_user(self):
+        serializer = UsersSerializer(
+            self.another_user, context={"request": self.mock_request}
+        )
+
+        self.assertIsNone(serializer.data.get("IsOnline"))
+
+    def test_display_online_status_of_friend_user(self):
+        self.friendship.status = Friendships.ACCEPTED
+        self.friendship.save()
+
+        serializer = UsersSerializer(
+            self.another_user, context={"request": self.mock_request}
+        )
+
+        self.assertIsNotNone(serializer.data.get("IsOnline"))
+        self.assertEqual(serializer.data["IsOnline"], False)
 
 
 class BlacklistSerializerTests(TestCase):
