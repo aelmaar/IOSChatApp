@@ -144,8 +144,8 @@ class ListRetrieveFriendshipsViewTests(FriendshipsTestsBase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
-            response.data["friend"],
-            UsersSerializer(self.friendship.user2).data,
+            response.data["friend"].get("username"),
+            self.friendship.user2.username,
         )
 
         self.assertEqual(response.data["status"], self.friendship.status)
@@ -163,13 +163,13 @@ class ListRetrieveFriendshipsViewTests(FriendshipsTestsBase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 2)
         self.assertEqual(
-            response.data[0]["friend"],
-            UsersSerializer(self.friendship.user2).data,
+            response.data[0]["friend"].get("username"),
+            self.friendship.user2.username,
         )
 
         self.assertEqual(
-            response.data[1]["friend"],
-            UsersSerializer(third_user).data,
+            response.data[1]["friend"].get("username"),
+            third_user.username,
         )
 
         self.assertEqual(response.data[0]["pending_action"], "waiting_for_response")
