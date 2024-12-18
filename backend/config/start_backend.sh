@@ -1,10 +1,17 @@
 #!/bin/bash
 
-# Wait until PostgreSQL is ready
-until pg_isready -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER; do
-  echo "Waiting for PostgreSQL..."
-  sleep 2
+# Wait for postgres
+while ! nc -z postgres 5432; do
+  sleep 0.1
 done
+
+# Wait for redis
+while ! nc -z redis 6379; do
+  sleep 0.1
+done
+
+# Create log directory for Gunicorn
+mkdir -p /var/log/gunicorn
 
 echo "Applying database migrations..."
 python manage.py migrate --noinput

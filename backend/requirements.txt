@@ -7,3 +7,6 @@ gunicorn
 requests
 pillow
 django-crontab
+channels
+daphne
+channels_redis

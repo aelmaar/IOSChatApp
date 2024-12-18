@@ -8,11 +8,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN apt-get update && apt-get install -y \
     postgresql-client \
     cron \
+    netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
+RUN mkdir -p /var/log/cron
+
 COPY . .
-
-# Create log directories
-RUN mkdir -p /var/log/cron /var/log/gunicorn
-
-CMD ["sh", "config/start_backend.sh"]

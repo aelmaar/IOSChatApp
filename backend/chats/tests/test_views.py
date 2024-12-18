@@ -116,6 +116,17 @@ class ConversationsViewTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(len(response.data) == 0)
 
+    def test_retrieve_conversation(self):
+        conversation = self.user.conversation_user1.all().first()
+
+        response = self.client.get(
+            f"{self.url}{conversation.id}/", headers=self.headers
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], conversation.id)
+        self.assertEqual(response.data["user"].get("username"), "anotheruser")
+
     def test_hide_conversation(self):
         """Make the conversation invisible from the user's view and hide it's messages"""
         conversation = self.user.conversation_user1.all().first()

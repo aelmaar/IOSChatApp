@@ -8,6 +8,7 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from .permissions import IsParticipantInConversation
+from notifications.consumers import ChatConsumer
 
 
 class MessagesService:
@@ -42,7 +43,17 @@ class ConversationsView(APIView):
 
     permission_classes = [IsAuthenticated, IsParticipantInConversation]
 
-    def get(self, request):
+    def get(self, request, pk=None):
+
+        if pk:
+            # Retrieve a conversation
+            conversation = get_object_or_404(Conversations, pk=pk)
+            serializer = ConversationsSerializer(
+                conversation, context={"request": request}
+            )
+
+            return Response(serializer.data)
+
         user = request.user
 
         conversations = Conversations.objects.filter(
@@ -126,7 +137,7 @@ class MessagesView(APIView):
 
     permission_classes = [IsAuthenticated, IsParticipantInConversation]
 
-    def get(self, request, pk):
+    def get(self, request, pk=None):
         user = request.user
         conversation = get_object_or_404(Conversations, pk=pk)
         self.check_object_permissions(request, conversation)
@@ -143,7 +154,7 @@ class MessagesView(APIView):
 
         return Response(serializer.data)
 
-    def post(self, request, pk):
+    def post(self, request, pk=None):
         conversation = get_object_or_404(Conversations, pk=pk)
         self.check_object_permissions(request, conversation)
 
@@ -156,10 +167,17 @@ class MessagesView(APIView):
             serializer.save()
             conversation.lastMessage = serializer.instance
             conversation.save()
+
+            # Send chat message to the other user via websocket
+            user = request.user
+            receiver_id = (
+                user.id if conversation.user1.id != user.id else conversation.user2.id
+            )
+            ChatConsumer.sendChatMessage(receiver_id, serializer.data)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def patch(self, request, pk):
+    def patch(self, request, pk=None):
         conversation = get_object_or_404(Conversations, pk=pk)
         self.check_object_permissions(request, conversation)
         action = request.data.get("action")

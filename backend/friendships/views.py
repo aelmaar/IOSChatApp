@@ -8,6 +8,7 @@ from django.db.models import Q
 from django.http import Http404
 from rest_framework.permissions import IsAuthenticated
 from .permissions import IsFriendshipParticipant
+from notifications.consumers import NotificationConsumer
 import logging
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,13 @@ class FriendshipsView(APIView):
         )
 
         if serializer.is_valid():
-            serializer.save()
+            user = request.user
+            friendship = serializer.save()
+            # Get receiver ID to send a friend request notification
+            receiver_id = (
+                friendship.user1.id if friendship.user1 != user else friendship.user2.id
+            )
+            NotificationConsumer.sendFriendRequest(receiver_id)
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
