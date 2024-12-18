@@ -390,8 +390,11 @@ class BlacklistSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         representation = super().to_representation(instance)
 
+        # Handle both dict and model instance cases
+        blocked_user = instance.get('blocked_user') if isinstance(instance, dict) else instance.blocked_user
+
         representation["blocked_user"] = UsersSerializer(
-            instance.blocked_user, context={"request": request}
+            blocked_user, context={"request": request}
         ).data
 
         return representation

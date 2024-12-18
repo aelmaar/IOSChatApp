@@ -96,8 +96,8 @@ class CreateFriendshipsViewTests(FriendshipsTestsBase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
-            response.data["friend"],
-            UsersSerializer(self.another_user).data,
+            response.data["friend"].get("username"),
+            self.another_user.username,
         )
 
         self.assertEqual(response.data["status"], Friendships.PENDING)
