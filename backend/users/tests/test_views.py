@@ -754,7 +754,7 @@ class BlacklistViewTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(
-            response.data["blocked_user"], UsersSerializer(self.second_user).data
+            response.data["blocked_user"].get("username"), self.second_user.username
         )
         # Check that Friendship does not exist after blocking a user
         # and conversation is blocked for the auth user

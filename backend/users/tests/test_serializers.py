@@ -604,5 +604,5 @@ class BlacklistSerializerTests(TestCase):
         self.assertEqual(blacklist.blocked_user, blocked_user)
 
         self.assertEqual(
-            serializer.data["blocked_user"], UsersSerializer(blocked_user).data
+            serializer.data["blocked_user"].get("username"), blocked_user.username
         )

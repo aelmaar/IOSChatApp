@@ -494,15 +494,16 @@ class UsersSearchView(APIView):
             filtered_users = Users.objects.filter(
                 Q(username__istartswith=value)
                 | (
-                    Q(first_name__icontains=first_name)
-                    & Q(last_name__icontains=last_name)
+                    Q(first_name__istartswith=first_name)
+                    & Q(last_name__istartswith=last_name)
                 )
             )
         else:
             # Single word search
             filtered_users = Users.objects.filter(
                 Q(username__istartswith=value)
-                | (Q(first_name__icontains=value) & Q(last_name__icontains=value))
+                | Q(first_name__istartswith=value)
+                | Q(last_name__istartswith=value)
             )
 
         if filtered_users:
@@ -549,6 +550,7 @@ class UserProfileView(APIView):
 
 class DeleteAccountView(APIView):
     """Delete user's account"""
+
     def delete(self, request):
         user = request.user
 
