@@ -10,6 +10,7 @@ from asgiref.sync import async_to_sync
 
 class BaseConsumer(AsyncWebsocketConsumer):
     """Base consumer for handling common functionalities for chat and notification consumers"""
+
     async def connect(self):
         self.user = self.scope.get("user", None)
 
