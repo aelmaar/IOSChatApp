@@ -69,7 +69,7 @@ class FriendshipsView(APIView):
                 friendship.user1.id if friendship.user1 != user else friendship.user2.id
             )
             NotificationConsumer.sendFriendRequest(receiver_id)
-            return Response(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def patch(self, request, pk=None):

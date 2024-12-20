@@ -94,7 +94,7 @@ class CreateFriendshipsViewTests(FriendshipsTestsBase):
             headers=self.headers,
         )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(
             response.data["friend"].get("username"),
             self.another_user.username,
