@@ -25,8 +25,10 @@ A **local development** chat app featuring:
 ### Database schema
 <img width="700" alt="Screenshot 2025-04-13 at 17 56 31" src="https://github.com/user-attachments/assets/9906eff0-a6c0-49bf-9bc3-8553f19119da" />
 
-## UI Design
-[View Full Figma Prototype](https://www.figma.com/design/Qip3qsv3B7VWAZOhubplKW/IOS-Chat-App?node-id=3-96&t=BEV0arpvZRia6rIb-1)
+## 🎨 UI Design  
+
+[*Click to view interactive Figma prototype*](https://www.figma.com/design/Qip3qsv3B7VWAZOhubplKW/IOS-Chat-App?node-id=3-96&t=BEV0arpvZRia6rIb-1)  
+
 
 ## 🛠️ Setup & Usage
 
